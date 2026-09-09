@@ -1,4 +1,4 @@
-# Implementation Summary — Kopi Kita (Coffee Shop Online Ordering)
+# Implementation Summary — Kopi Senja (Coffee Shop Online Ordering)
 
 Next.js 15 (App Router) + TypeScript + Prisma 6 (SQLite) + Tailwind v4 + Zustand 5 + Radix UI. Built by `frontend-react`.
 

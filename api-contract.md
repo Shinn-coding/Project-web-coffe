@@ -1,4 +1,4 @@
-# API Contract — Kopi Kita
+# API Contract — Kopi Senja
 
 All responses: `{ success: boolean, error?: string, data?: T | null, ... }`. Errors use 4xx/5xx with `error` message. Admin routes require cookie `admin_session` (set by login; httpOnly, 8h). Money is integer Rupiah. Admin routes use numeric IDs; guest order tracking uses numeric ID + `orderToken` (see below).
 

@@ -40,8 +40,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       description: body.description !== undefined ? (body.description as string)?.trim() || null : existing.description,
       imageUrl: body.imageUrl !== undefined ? (body.imageUrl as string)?.trim() || null : existing.imageUrl,
       available: body.available !== undefined ? typeof body.available === "boolean" ? body.available : existing.available : existing.available,
+      // ponytail: null -> undefined so Prisma treats it as "no change"
       customizationOptions:
-        typeof body.customizationOptions === "string" ? body.customizationOptions : existing.customizationOptions,
+        typeof body.customizationOptions === "string"
+          ? body.customizationOptions
+          : (existing.customizationOptions ?? undefined),
     },
     include: { category: true },
   });
