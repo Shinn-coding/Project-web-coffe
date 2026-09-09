@@ -12,5 +12,5 @@ export default async function MenuPage() {
     }),
   ]);
 
-  return <MenuClient initialItems={items} categories={categories} />;
+  return <MenuClient initialItems={items.map((m) => ({ ...m, customizationOptions: String(m.customizationOptions ?? "") }))} categories={categories} />;
 }

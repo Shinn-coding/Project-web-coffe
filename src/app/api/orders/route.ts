@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
       if (!menu) return NextResponse.json({ success: false, error: "Menu tidak ditemukan" }, { status: 400 });
       if (!menu.available) return NextResponse.json({ success: false, error: `"${menu.name}" sedang habis` }, { status: 400 });
 
-      const opts = parseOptions(menu.customizationOptions);
+      const opts = parseOptions(typeof menu.customizationOptions === "string" ? menu.customizationOptions : "");
       const selection = {
         size: line.selection?.size ?? "",
         sugar: line.selection?.sugar ?? "",
