@@ -1,0 +1,108 @@
+// Coffee Shop Ordering System — Guest checkout, no customer accounts
+// SQLite local dev database
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ──────────────────────────────────────────────
+
+enum OrderStatus {
+  baru        // Baru / New
+  diproses    // Diproses / Processing
+  siap_diambil // Siap Diambil / Ready
+  selesai     // Selesai / Done
+}
+
+enum Role {
+  admin
+  kasir
+}
+
+// ─── Models ─────────────────────────────────────────────
+
+model Category {
+  id          Int        @id @default(autoincrement())
+  name        String     @unique
+  description String?
+  menuItems   MenuItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model MenuItem {
+  id          Int     @id @default(autoincrement())
+  name        String
+  description String?
+  price       Int     // Rupiah, e.g. 25000 = Rp 25.000
+  imageUrl    String?
+  available   Boolean @default(true)
+
+  // stores: size, sugar level, ice level, extra shot, toppings
+  customizationOptions Json
+
+  categoryId Int
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  orderItems OrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([categoryId])
+  @@index([available])
+}
+
+model Order {
+  id           Int         @id @default(autoincrement())
+  orderNumber  String      @unique // Display number for customer, e.g. "A042"
+  orderToken   String      @unique // Unguessable guest tracking token (crypto.randomUUID)
+  customerName String?
+  tableNumber  String?
+  status       OrderStatus @default(baru)
+  totalPrice   Int         // Rupiah total
+
+  items OrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([status, createdAt]) // Composite: "show all pending orders today"
+}
+
+model OrderItem {
+  id       Int @id @default(autoincrement())
+  quantity Int @default(1)
+
+  // Snapshots at order time — menu changes don't affect these
+  itemName   String
+  unitPrice  Int  // Rupiah at time of order
+  subtotal   Int  // unitPrice * quantity
+  customization Json
+
+  orderId    Int
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItemId Int
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([menuItemId])
+}
+
+model AdminUser {
+  id           Int    @id @default(autoincrement())
+  username     String @unique
+  passwordHash String
+  name         String
+  role         Role   @default(kasir)
+
+  createdAt DateTime @default(now())
+}

@@ -1,0 +1,127 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* ─── Raw design tokens (DESIGN.md) ─────────────────────── */
+:root {
+  --bg: oklch(1.000 0.000 0);                          /* #ffffff      */
+  --surface: oklch(0.985 0.010 74);                    /* #faf7f2      */
+  --surface-2: oklch(0.962 0.018 72);                  /* #f3ece3      */
+  --ink: oklch(0.300 0.040 55);                        /* #3d2f26      */
+  --muted: oklch(0.480 0.045 55);                      /* #6b5a4b      */
+  --border: oklch(0.880 0.020 70);                     /* #e6ddd1      */
+  --on-surface: oklch(0.360 0.045 58);                 /* #4a3a2d      */
+
+  --primary: oklch(0.465 0.090 55);                    /* coffee brown */
+  --primary-hover: oklch(0.420 0.090 55);
+  --primary-fg: oklch(0.985 0.010 70);
+  --on-primary-soft: oklch(0.420 0.080 55);
+
+  --accent: oklch(0.600 0.120 150);                    /* matcha green */
+  --accent-hover: oklch(0.545 0.115 150);
+  --accent-fg: oklch(0.985 0.010 130);
+
+  /* status language — color + label + icon (never color alone) */
+  --status-baru: oklch(0.600 0.120 150);
+  --status-diproses: oklch(0.650 0.130 65);
+  --status-siap: oklch(0.580 0.200 250);
+  --status-selesai: oklch(0.500 0.050 55);
+
+  --status-error: oklch(0.600 0.180 25);
+
+  /* shadows */
+  --shadow-sm: 0 1px 2px rgba(61, 47, 38, 0.06);
+  --shadow-md: 0 4px 10px rgba(61, 47, 38, 0.10);
+  --shadow-lg: 0 8px 24px rgba(61, 47, 38, 0.14);
+}
+
+/* ─── Tailwind theme mapping ─────────────────────────────── */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-on-surface: var(--on-surface);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-fg: var(--primary-fg);
+  --color-on-primary-soft: var(--on-primary-soft);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-fg);
+  --color-status-baru: var(--status-baru);
+  --color-status-diproses: var(--status-diproses);
+  --color-status-siap: var(--status-siap);
+  --color-status-selesai: var(--status-selesai);
+  --color-status-error: var(--status-error);
+
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  --font-sans: var(--font-inter), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  --header-height: 68px;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-inter), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Visible focus: 2px primary ring, 2px offset — every interactive element */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Motion: reduced motion → instant transitions */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* 2-line clamp */
+@utility line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+/* hide scrollbar for chip rows (still scrollable) */
+@utility scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(0.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-enter {
+  animation: page-enter 300ms ease-out;
+}
