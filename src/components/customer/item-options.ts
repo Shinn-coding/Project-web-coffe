@@ -2,7 +2,7 @@ import type { MenuItemDto } from "@/lib/types";
 
 export function hasRequiredOptions(item: MenuItemDto): boolean {
   const raw = item.customizationOptions;
-  let opts: any = {};
+  let opts: Record<string, any> = {};
   if (typeof raw === "string") {
     try {
       opts = JSON.parse(raw || "{}");

@@ -1,5 +1,6 @@
 // Shared types between customer + admin
 import type { OrderStatus } from "@prisma/client";
+export type { OrderStatus };
 
 export interface MenuItemDto {
   id: number;

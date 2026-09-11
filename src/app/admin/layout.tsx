@@ -9,6 +9,7 @@ import {
   ReceiptText,
   UtensilsCrossed,
   BarChart3,
+  KeyRound,
   LogOut,
   Coffee,
 } from "lucide-react";
@@ -19,6 +20,7 @@ const NAV = [
   { href: "/admin/orders", label: "Pesanan", icon: ReceiptText },
   { href: "/admin/menu", label: "Menu", icon: UtensilsCrossed },
   { href: "/admin/reports", label: "Laporan", icon: BarChart3 },
+  { href: "/admin/change-password", label: "Ganti Password", icon: KeyRound },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

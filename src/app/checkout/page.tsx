@@ -10,6 +10,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { formatRupiah } from "@/lib/format";
 import { useCart, cartCount, cartSubtotal } from "@/lib/store/cart";
 import type { CartLineInput } from "@/lib/types";
+import { addOrderToHistory } from "@/lib/order-history";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -57,8 +58,9 @@ export default function CheckoutPage() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Gagal mengirim pesanan");
-      clear();
-      router.push(`/order/${json.order.id}?token=${json.orderToken}`);
+clear();
+        addOrderToHistory(json.order.id, json.order.orderNumber, json.orderToken);
+        router.push(`/order/${json.order.id}?token=${json.orderToken}`);
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Terjadi kesalahan. Coba lagi.");
       setSubmitting(false);
