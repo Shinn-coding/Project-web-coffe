@@ -8,3 +8,5 @@ opencode.example.json
 data/
 .env*
 DESIGN.md
+prisma/dev.db.backup
+tsconfig.tsbuildinfo
