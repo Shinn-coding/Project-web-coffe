@@ -103,20 +103,26 @@ async function createOrderWithRetry(args: {
   orderToken: string;
 }) {
   const attempt = async () => {
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayCount = await prisma.order.count({ where: { createdAt: { gte: todayStart } } });
-    const orderNumber = String(todayCount + 1).padStart(4, "0");
-    return prisma.order.create({
-      data: {
-        orderNumber,
-        orderToken: args.orderToken,
-        customerName: args.name,
-        tableNumber: args.tableNumber,
-        totalPrice: args.total,
-        items: { create: args.orderItems },
-      },
-      include: { items: true },
+    // ponytail: count+create in one transaction; SQLite serializes writes so the
+    // day-sequence count is race-safe. P2002 re-runs the whole attempt (fresh count).
+return await prisma.$transaction(async (tx) => {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayCount = await tx.order.count({
+        where: { createdAt: { gte: todayStart } },
+      });
+      const orderNumber = String(todayCount + 1).padStart(4, "0");
+      return tx.order.create({
+        data: {
+          orderNumber,
+          orderToken: args.orderToken,
+          customerName: args.name,
+          tableNumber: args.tableNumber,
+          totalPrice: args.total,
+          items: { create: args.orderItems },
+        },
+        include: { items: true },
+      });
     });
   };
   try {

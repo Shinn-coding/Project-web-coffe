@@ -93,6 +93,12 @@ export function MenuClient({
             <p className="text-xs text-muted">Pesan cepat, bayar di kasir</p>
           </div>
         </div>
+        <a
+          href="/riwayat"
+          className="inline-flex h-11 items-center rounded-full px-4 text-sm font-medium text-ink hover:bg-surface-2 transition-colors"
+        >
+          Riwayat Pesanan Saya
+        </a>
         <button
           type="button"
           aria-label={`Buka keranjang, ${count} item`}
