@@ -103,7 +103,13 @@ function OrderEntry({ entry }: { entry: OrderHistoryEntry }) {
 }
 
 export default function RiwayatPage() {
-  const [entries, setEntries] = useState<OrderHistoryEntry[]>(() => getOrderHistory());
+  const [entries, setEntries] = useState<OrderHistoryEntry[]>([]);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setEntries(getOrderHistory());
+    setMounted(true);
+  }, []);
 
   return (
     <main className="mx-auto w-full max-w-[480px] px-4 pb-16 pt-8">
@@ -115,7 +121,11 @@ export default function RiwayatPage() {
 
       <h1 className="mt-4 text-2xl font-bold text-ink">Riwayat Pesanan Saya</h1>
 
-      {entries.length === 0 ? (
+      {!mounted ? (
+        <div className="mt-12 text-center">
+          <p className="text-sm text-muted">Memuat riwayat...</p>
+        </div>
+      ) : entries.length === 0 ? (
         <div className="mt-12 text-center">
           <p className="text-sm text-muted">Belum ada pesanan.</p>
           <a
