@@ -11,6 +11,7 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
     "seed:export": "tsx scripts/export-seed.ts",
+    "db:backup": "tsx scripts/backup-db.ts",
     "db:studio": "prisma studio"
   },
   "prisma": {
