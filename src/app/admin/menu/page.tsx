@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Plus, Pencil, Trash2, ImageOff } from "lucide-react";
+import { OptionGroupBuilder, validateGroups, groupsToOptions, optionsToGroups } from "@/components/admin/option-group-builder";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -11,8 +12,8 @@ import { MenuItemImage } from "@/components/ui/menu-item-image";
 import { useToasts, ToastHost } from "@/components/ui/toast";
 import { formatRupiah } from "@/lib/format";
 import type { MenuItemDto } from "@/lib/types";
+import type { GroupModel } from "@/lib/option-groups";
 
-const EMPTY_OPTS = "{}";
 
 export default function AdminMenuPage() {
   const [items, setItems] = useState<MenuItemDto[]>([]);
@@ -192,7 +193,10 @@ function MenuForm({
   const [description, setDescription] = useState(initial?.description ?? "");
   const [imageUrl, setImageUrl] = useState(initial?.imageUrl ?? "");
   const [available, setAvailable] = useState(initial?.available ?? true);
-  const [optsText, setOptsText] = useState(initial?.customizationOptions ?? EMPTY_OPTS);
+  // Stored JSON parsed once into editable groups; submitted back via groupsToOptions
+  const [groups, setGroups] = useState<GroupModel[]>(() =>
+    optionsToGroups(initial?.customizationOptions ?? undefined)
+  );
   const [saving, setSaving] = useState(false);
   const [errMsg, setErrMsg] = useState<string | null>(null);
 
@@ -204,13 +208,12 @@ function MenuForm({
       setErrMsg("Nama, kategori, dan harga wajib diisi");
       return;
     }
-    let options: string;
-    try {
-      options = JSON.stringify(JSON.parse(optsText || EMPTY_OPTS));
-    } catch {
-      setErrMsg("Opsional JSON tidak valid");
+    const check = validateGroups(groups);
+    if (!check.ok) {
+      setErrMsg(check.error ?? "Grup opsi tidak valid");
       return;
     }
+    const options = JSON.stringify(groupsToOptions(groups));
     setSaving(true);
     try {
       const payload = {
@@ -290,15 +293,9 @@ function MenuForm({
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="m-opts" className="text-sm font-medium text-on-surface">Opsional (JSON)</label>
-          <textarea
-            id="m-opts"
-            rows={4}
-            value={optsText}
-            onChange={(e) => setOptsText(e.target.value)}
-            className="resize-y rounded-[var(--radius-sm)] border border-border bg-bg px-3 py-2 font-mono text-xs text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            placeholder={'{"sizes":[{"name":"Reguler","priceDelta":0}],"sugarLevels":["Normal"],"iceLevels":["Es Normal"],"extras":[]}'}
-          />
+          <span className="text-sm font-medium text-on-surface">Opsi Tambahan (opsional)</span>
+          <p className="text-xs text-muted">Buat grup pilihan seperti Ukuran, Level Gula, atau Topping. Harga tambahan boleh 0.</p>
+          <OptionGroupBuilder value={groups} onChange={setGroups} />
         </div>
 
         <label className="flex items-center justify-between rounded-[var(--radius-sm)] bg-bg px-3 py-2.5">

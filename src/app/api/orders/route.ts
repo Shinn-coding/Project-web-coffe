@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
-import { parseOptions, selectionDelta } from "@/lib/customization";
+import { normalizeOptions, sanitizeSelection, selectionDelta, specLine } from "@/lib/customization";
 import { emitNewOrder } from "@/lib/order-stream";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +10,7 @@ const MAX_QTY = 9;
 
 /** POST /api/orders — guest checkout, no auth. Computes total server-side. */
 export async function POST(req: NextRequest) {
-  let body: { customerName?: string; tableNumber?: string; items?: { menuItemId: number; quantity: number; selection: { size?: string; sugar?: string; ice?: string; extras?: string[] } }[] };
+  let body: { customerName?: string; tableNumber?: string; items?: { menuItemId: number; quantity: number; selection?: unknown }[] };
   try {
     body = await req.json();
   } catch {
@@ -41,28 +41,17 @@ export async function POST(req: NextRequest) {
       if (!menu) return NextResponse.json({ success: false, error: "Menu tidak ditemukan" }, { status: 400 });
       if (!menu.available) return NextResponse.json({ success: false, error: `"${menu.name}" sedang habis` }, { status: 400 });
 
-      const opts = parseOptions(typeof menu.customizationOptions === "string" ? menu.customizationOptions : "");
-      const selection = {
-        size: line.selection?.size ?? "",
-        sugar: line.selection?.sugar ?? "",
-        ice: line.selection?.ice ?? "",
-        extras: line.selection?.extras ?? [],
-        quantity: line.quantity,
-      };
+      // ponytail: normalizeOptions covers legacy fixed keys + canonical groups;
+      // sanitizeSelection drops unknown/illegal option names from the guest payload.
+      const opts = normalizeOptions(typeof menu.customizationOptions === "string" ? menu.customizationOptions : "");
+      const selection = sanitizeSelection(line.selection, opts);
+      selection.quantity = line.quantity;
       const unitPrice = menu.price + selectionDelta(opts, selection);
       const subtotal = unitPrice * line.quantity;
       total += subtotal;
 
       // Snapshot customization as display strings for receipt
-      const spec: string[] = [];
-      const sizeOpt = opts.sizes?.find((s) => s.name === selection.size);
-      if (selection.size) spec.push(sizeOpt ? `${sizeOpt.name}${sizeOpt.priceDelta ? ` (+Rp ${sizeOpt.priceDelta.toLocaleString("id-ID")})` : ""}` : selection.size);
-      if (selection.sugar) spec.push(selection.sugar);
-      if (selection.ice) spec.push(selection.ice);
-      for (const ex of selection.extras ?? []) {
-        const extra = opts.extras?.find((e) => e.name === ex);
-        spec.push(extra && extra.priceDelta ? `${extra.name} (+Rp ${extra.priceDelta.toLocaleString("id-ID")})` : ex);
-      }
+      const spec: string[] = specLine(selection, opts);
 
       orderItems.push({
         menuItemId: menu.id,
@@ -77,7 +66,7 @@ export async function POST(req: NextRequest) {
     // Order number: day sequence, zero-padded 4 digits (#0421).
     // Generate token, wrap create in retry-once for unique-collision race (S3).
     const orderToken = randomUUID();
-const order = await createOrderWithRetry({
+    const order = await createOrderWithRetry({
     name,
     tableNumber: body.tableNumber?.trim() || null,
     total,
@@ -85,7 +74,8 @@ const order = await createOrderWithRetry({
     orderToken,
   });
 
-  emitNewOrder({ ...order, id: String(order.id), orderNumber: Number(order.orderNumber) });
+  // Minimal SSE payload — no customer/order data beyond what the admin inbox needs
+  emitNewOrder({ id: String(order.id), orderNumber: order.orderNumber, status: order.status });
 
   return NextResponse.json({ success: true, order, orderToken }, { status: 201 });
   } catch (err) {

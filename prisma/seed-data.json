@@ -1,0 +1,163 @@
+{
+  "exportedAt": "2026-09-13T09:46:28.341Z",
+  "categories": [
+    {
+      "name": "Kopi",
+      "description": "Espresso-based & manual brew"
+    },
+    {
+      "name": "Non-Kopi",
+      "description": "Matcha, cokelat, dan lainnya"
+    },
+    {
+      "name": "Pastry & Snack",
+      "description": "Roti, kue, dan camilan"
+    }
+  ],
+  "menuItems": [
+    {
+      "name": "Espresso",
+      "description": "Shot kopi pekat, robusta & arabica blend.",
+      "price": 15000,
+      "imageUrl": "https://images.unsplash.com/photo-1510591509098-f4fdc6d0ff04?w=400&h=400&fit=crop&auto=format",
+      "available": true,
+      "customizationOptions": "{\"sizes\":[{\"name\":\"Reguler\",\"priceDelta\":0},{\"name\":\"Large\",\"priceDelta\":3000}],\"sugarLevels\":[\"Tanpa Gula\",\"Sedikit\",\"Normal\",\"Manis\"],\"iceLevels\":[\"Tanpa Es\",\"Es Sedikit\",\"Es Normal\",\"Es Banyak\"],\"extras\":[{\"name\":\"Extra Shot\",\"priceDelta\":5000},{\"name\":\"Whipped Cream\",\"priceDelta\":4000}]}",
+      "categoryName": "Kopi"
+    },
+    {
+      "name": "Americano",
+      "description": "Espresso + air panas, ringan dan bersih.",
+      "price": 18000,
+      "imageUrl": "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=400&h=400&fit=crop&auto=format",
+      "available": true,
+      "customizationOptions": "{\"sizes\":[{\"name\":\"Reguler\",\"priceDelta\":0},{\"name\":\"Large\",\"priceDelta\":3000}],\"sugarLevels\":[\"Tanpa Gula\",\"Sedikit\",\"Normal\",\"Manis\"],\"iceLevels\":[\"Tanpa Es\",\"Es Sedikit\",\"Es Normal\",\"Es Banyak\"],\"extras\":[{\"name\":\"Extra Shot\",\"priceDelta\":5000},{\"name\":\"Whipped Cream\",\"priceDelta\":4000}]}",
+      "categoryName": "Kopi"
+    },
+    {
+      "name": "Cappuccino",
+      "description": "Espresso dengan busa susu lembut.",
+      "price": 22000,
+      "imageUrl": "https://images.unsplash.com/photo-1572442388796-11668a67e53d?w=400&h=400&fit=crop&auto=format",
+      "available": true,
+      "customizationOptions": "{\"sizes\":[{\"name\":\"Reguler\",\"priceDelta\":0},{\"name\":\"Large\",\"priceDelta\":3000}],\"sugarLevels\":[\"Tanpa Gula\",\"Sedikit\",\"Normal\",\"Manis\"],\"iceLevels\":[\"Tanpa Es\",\"Es Sedikit\",\"Es Normal\",\"Es Banyak\"],\"extras\":[{\"name\":\"Extra Shot\",\"priceDelta\":5000},{\"name\":\"Whipped Cream\",\"priceDelta\":4000}]}",
+      "categoryName": "Kopi"
+    },
+    {
+      "name": "Caffe Latte",
+      "description": "Espresso + susu steamed, creamy.",
+      "price": 24000,
+      "imageUrl": "https://images.unsplash.com/photo-1541167760496-1628856ab772?w=400&h=400&fit=crop&auto=format",
+      "available": true,
+      "customizationOptions": "{\"sizes\":[{\"name\":\"Reguler\",\"priceDelta\":0},{\"name\":\"Large\",\"priceDelta\":3000}],\"sugarLevels\":[\"Tanpa Gula\",\"Sedikit\",\"Normal\",\"Manis\"],\"iceLevels\":[\"Tanpa Es\",\"Es Sedikit\",\"Es Normal\",\"Es Banyak\"],\"extras\":[{\"name\":\"Extra Shot\",\"priceDelta\":5000},{\"name\":\"Whipped Cream\",\"priceDelta\":4000}]}",
+      "categoryName": "Kopi"
+    },
+    {
+      "name": "Caramel Macchiato",
+      "description": "Latte dengan saus karamel manis.",
+      "price": 27000,
+      "imageUrl": "https://i.pinimg.com/736x/8e/41/dd/8e41dd49821ad3f6cd98b330b954944a.jpg",
+      "available": true,
+      "customizationOptions": "{\"groups\":[{\"id\":\"g-0-ukuran\",\"name\":\"Ukuran\",\"type\":\"single\",\"options\":[{\"name\":\"Reguler\",\"priceDelta\":0},{\"name\":\"Large\",\"priceDelta\":3000}]},{\"id\":\"g-1-tingkat-gula\",\"name\":\"Tingkat Gula\",\"type\":\"single\",\"options\":[{\"name\":\"Tanpa Gula\",\"priceDelta\":0},{\"name\":\"Sedikit\",\"priceDelta\":0},{\"name\":\"Normal\",\"priceDelta\":0},{\"name\":\"Manis\",\"priceDelta\":0}]},{\"id\":\"g-2-tingkat-es\",\"name\":\"Tingkat Es\",\"type\":\"single\",\"options\":[{\"name\":\"Tanpa Es\",\"priceDelta\":0},{\"name\":\"Es Sedikit\",\"priceDelta\":0},{\"name\":\"Es Normal\",\"priceDelta\":0},{\"name\":\"Es Banyak\",\"priceDelta\":0}]},{\"id\":\"g-3-tambahan\",\"name\":\"Tambahan\",\"type\":\"multiple\",\"options\":[{\"name\":\"Extra Shot\",\"priceDelta\":5000},{\"name\":\"Whipped Cream\",\"priceDelta\":4000}]}]}",
+      "categoryName": "Kopi"
+    },
+    {
+      "name": "Cold Brew",
+      "description": "Seduhan dingin 12 jam, smooth & pekat.",
+      "price": 25000,
+      "imageUrl": "https://images.unsplash.com/photo-1517701550927-30cf4ba1dba5?w=400&h=400&fit=crop&auto=format",
+      "available": true,
+      "customizationOptions": "{\"sizes\":[{\"name\":\"Reguler\",\"priceDelta\":0},{\"name\":\"Large\",\"priceDelta\":3000}],\"sugarLevels\":[\"Tanpa Gula\",\"Sedikit\",\"Normal\",\"Manis\"],\"iceLevels\":[\"Tanpa Es\",\"Es Sedikit\",\"Es Normal\",\"Es Banyak\"],\"extras\":[{\"name\":\"Extra Shot\",\"priceDelta\":5000},{\"name\":\"Whipped Cream\",\"priceDelta\":4000}]}",
+      "categoryName": "Kopi"
+    },
+    {
+      "name": "Matcha Latte",
+      "description": "Matcha grade-A dengan susu segar.",
+      "price": 26000,
+      "imageUrl": "https://images.unsplash.com/photo-1515823064-d6e0c04616a7?w=400&h=400&fit=crop&auto=format",
+      "available": true,
+      "customizationOptions": "{\"sizes\":[{\"name\":\"Reguler\",\"priceDelta\":0},{\"name\":\"Large\",\"priceDelta\":3000}],\"sugarLevels\":[\"Tanpa Gula\",\"Sedikit\",\"Normal\",\"Manis\"],\"iceLevels\":[\"Tanpa Es\",\"Es Sedikit\",\"Es Normal\",\"Es Banyak\"],\"extras\":[{\"name\":\"Extra Shot\",\"priceDelta\":5000},{\"name\":\"Whipped Cream\",\"priceDelta\":4000}]}",
+      "categoryName": "Non-Kopi"
+    },
+    {
+      "name": "Cokelat Panas",
+      "description": "Hot chocolate kental, topping marshmallow.",
+      "price": 22000,
+      "imageUrl": "https://images.unsplash.com/photo-1542990253-0d0f5be5f0ed?w=400&h=400&fit=crop&auto=format",
+      "available": true,
+      "customizationOptions": "{\"sizes\":[{\"name\":\"Reguler\",\"priceDelta\":0},{\"name\":\"Large\",\"priceDelta\":3000}],\"sugarLevels\":[\"Tanpa Gula\",\"Sedikit\",\"Normal\",\"Manis\"],\"iceLevels\":[\"Tanpa Es\",\"Es Sedikit\",\"Es Normal\",\"Es Banyak\"],\"extras\":[{\"name\":\"Extra Shot\",\"priceDelta\":5000},{\"name\":\"Whipped Cream\",\"priceDelta\":4000}]}",
+      "categoryName": "Non-Kopi"
+    },
+    {
+      "name": "Thai Tea",
+      "description": "Teh thailand manis dengan susu.",
+      "price": 20000,
+      "imageUrl": "https://i.pinimg.com/1200x/f4/17/28/f41728151235dd9de06e8dea3a7f7d9f.jpg",
+      "available": true,
+      "customizationOptions": "{\"groups\":[{\"id\":\"g-0-ukuran\",\"name\":\"Ukuran\",\"type\":\"single\",\"options\":[{\"name\":\"Reguler\",\"priceDelta\":0},{\"name\":\"Large\",\"priceDelta\":3000}]},{\"id\":\"g-1-tingkat-gula\",\"name\":\"Tingkat Gula\",\"type\":\"single\",\"options\":[{\"name\":\"Tanpa Gula\",\"priceDelta\":0},{\"name\":\"Sedikit\",\"priceDelta\":0},{\"name\":\"Normal\",\"priceDelta\":0},{\"name\":\"Manis\",\"priceDelta\":0}]},{\"id\":\"g-2-tingkat-es\",\"name\":\"Tingkat Es\",\"type\":\"single\",\"options\":[{\"name\":\"Tanpa Es\",\"priceDelta\":0},{\"name\":\"Es Sedikit\",\"priceDelta\":0},{\"name\":\"Es Normal\",\"priceDelta\":0},{\"name\":\"Es Banyak\",\"priceDelta\":0}]},{\"id\":\"g-3-tambahan\",\"name\":\"Tambahan\",\"type\":\"multiple\",\"options\":[{\"name\":\"Extra Shot\",\"priceDelta\":5000},{\"name\":\"Whipped Cream\",\"priceDelta\":4000}]}]}",
+      "categoryName": "Non-Kopi"
+    },
+    {
+      "name": "Lemon Tea",
+      "description": "Teh hitam segar dengan perasan lemon.",
+      "price": 16000,
+      "imageUrl": "https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=400&h=400&fit=crop&auto=format",
+      "available": true,
+      "customizationOptions": "{\"sizes\":[{\"name\":\"Reguler\",\"priceDelta\":0},{\"name\":\"Large\",\"priceDelta\":3000}],\"sugarLevels\":[\"Tanpa Gula\",\"Sedikit\",\"Normal\",\"Manis\"],\"iceLevels\":[\"Tanpa Es\",\"Es Sedikit\",\"Es Normal\",\"Es Banyak\"],\"extras\":[{\"name\":\"Extra Shot\",\"priceDelta\":5000},{\"name\":\"Whipped Cream\",\"priceDelta\":4000}]}",
+      "categoryName": "Non-Kopi"
+    },
+    {
+      "name": "Red Velvet",
+      "description": "Minuman red velvet creamy, manis.",
+      "price": 24000,
+      "imageUrl": "https://i.pinimg.com/736x/02/ca/51/02ca51cecec5eb898177fceedd5d4518.jpg",
+      "available": true,
+      "customizationOptions": "{\"groups\":[{\"id\":\"g-0-ukuran\",\"name\":\"Ukuran\",\"type\":\"single\",\"options\":[{\"name\":\"Reguler\",\"priceDelta\":0},{\"name\":\"Large\",\"priceDelta\":3000}]},{\"id\":\"g-1-tingkat-gula\",\"name\":\"Tingkat Gula\",\"type\":\"single\",\"options\":[{\"name\":\"Tanpa Gula\",\"priceDelta\":0},{\"name\":\"Sedikit\",\"priceDelta\":0},{\"name\":\"Normal\",\"priceDelta\":0},{\"name\":\"Manis\",\"priceDelta\":0}]},{\"id\":\"g-2-tingkat-es\",\"name\":\"Tingkat Es\",\"type\":\"single\",\"options\":[{\"name\":\"Tanpa Es\",\"priceDelta\":0},{\"name\":\"Es Sedikit\",\"priceDelta\":0},{\"name\":\"Es Normal\",\"priceDelta\":0},{\"name\":\"Es Banyak\",\"priceDelta\":0}]},{\"id\":\"g-3-tambahan\",\"name\":\"Tambahan\",\"type\":\"multiple\",\"options\":[{\"name\":\"Extra Shot\",\"priceDelta\":5000},{\"name\":\"Whipped Cream\",\"priceDelta\":4000}]}]}",
+      "categoryName": "Non-Kopi"
+    },
+    {
+      "name": "Croissant",
+      "description": "Croissant mentega, renyah berlapis.",
+      "price": 18000,
+      "imageUrl": "https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=400&h=400&fit=crop&auto=format",
+      "available": true,
+      "customizationOptions": "{\"extras\":[{\"name\":\"Mentega Ekstra\",\"priceDelta\":2000},{\"name\":\"Selai\",\"priceDelta\":3000}]}",
+      "categoryName": "Pastry & Snack"
+    },
+    {
+      "name": "Banana Bread",
+      "description": "Roti pisang lembut, iris tebal.",
+      "price": 16000,
+      "imageUrl": "https://i.pinimg.com/1200x/af/82/3b/af823be8195ddfd8f7330c6f9a8f4105.jpg",
+      "available": true,
+      "customizationOptions": "{\"groups\":[{\"id\":\"g-0-tambahan\",\"name\":\"Tambahan\",\"type\":\"multiple\",\"options\":[{\"name\":\"Mentega Ekstra\",\"priceDelta\":2000},{\"name\":\"Selai\",\"priceDelta\":3000}]}]}",
+      "categoryName": "Pastry & Snack"
+    },
+    {
+      "name": "Cheesecake",
+      "description": "Cheesecake krim lembut, base graham.",
+      "price": 23000,
+      "imageUrl": "https://images.unsplash.com/photo-1524351199678-941a58a3df50?w=400&h=400&fit=crop&auto=format",
+      "available": true,
+      "customizationOptions": "{\"extras\":[{\"name\":\"Mentega Ekstra\",\"priceDelta\":2000},{\"name\":\"Selai\",\"priceDelta\":3000}]}",
+      "categoryName": "Pastry & Snack"
+    },
+    {
+      "name": "Cinnamon Roll",
+      "description": "Roti gulung kayu manis, glaze gula.",
+      "price": 20000,
+      "imageUrl": "https://images.unsplash.com/photo-1509365465985-25d11c17e812?w=400&h=400&fit=crop&auto=format",
+      "available": true,
+      "customizationOptions": "{\"extras\":[{\"name\":\"Mentega Ekstra\",\"priceDelta\":2000},{\"name\":\"Selai\",\"priceDelta\":3000}]}",
+      "categoryName": "Pastry & Snack"
+    },
+    {
+      "name": "Matcha Croissant",
+      "description": "Croissant isi krim matcha",
+      "price": 22000,
+      "imageUrl": "https://i.pinimg.com/736x/0a/10/d5/0a10d507d0c4d05fde3d62037bbab567.jpg",
+      "available": true,
+      "customizationOptions": "{\"groups\":[{\"id\":\"g-0-tambahan\",\"name\":\"Tambahan\",\"type\":\"single\",\"options\":[{\"name\":\"Mentega Ekstra\",\"priceDelta\":2000},{\"name\":\"Selai\",\"priceDelta\":3000}]}]}",
+      "categoryName": "Pastry & Snack"
+    }
+  ]
+}

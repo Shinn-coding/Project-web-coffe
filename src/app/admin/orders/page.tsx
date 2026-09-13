@@ -54,7 +54,7 @@ export default function AdminOrdersPage() {
   useEffect(() => {
     const es = new EventSource("/api/admin/orders/stream");
     es.addEventListener("new-order", (e) => {
-      const data = JSON.parse((e as MessageEvent).data) as { id: string; orderNumber: number; status: string };
+      const data = JSON.parse((e as MessageEvent).data) as { id: string; orderNumber: string; status: string };
       knownIds.current.add(Number(data.id));
       if (data.status === "baru") pushToast(`Pesanan baru #${data.orderNumber}!`);
     });

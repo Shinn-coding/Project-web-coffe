@@ -1,22 +1,34 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 
 import { Spinner } from "@/components/ui/spinner";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { formatRupiah, STATUS_COLOR, STATUS_LABEL } from "@/lib/format";
-import { addOrderToHistory, getOrderHistory, OrderHistoryEntry } from "@/lib/order-history";
-import { OrderDto, OrderItemDto } from "@/lib/types";
+import { formatRupiah } from "@/lib/format";
+import {
+  getOrderHistory,
+  removeOrderFromHistory,
+  pruneFinishedEntries,
+  cacheOrderStatus,
+  type OrderHistoryEntry,
+} from "@/lib/order-history";
+import type { OrderDto } from "@/lib/types";
 
 const POLL_MS = 5000;
 
-function OrderEntry({ entry }: { entry: OrderHistoryEntry }) {
+function OrderEntry({ entry, onGone }: { entry: OrderHistoryEntry; onGone: () => void }) {
   const [data, setData] = useState<OrderDto | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!entry.id) {
-      setError("Tidak dapat memuat status. Periksa di kasir.");
+      // ponytail: entry dari format localStorage lama (sebelum migrasi) tidak punya
+      // id — tidak mungkin di-fetch, jadi buang langsung dari riwayat, sama seperti
+      // entry yang 404 dari server. Jangan biarkan tergantung dengan error statis.
+      console.warn(`[riwayat] entry #${entry.orderNumber} tanpa id (format lama) — entry dibersihkan`);
+      removeOrderFromHistory(entry.orderNumber);
+      onGone();
       return;
     }
 
@@ -26,9 +38,15 @@ function OrderEntry({ entry }: { entry: OrderHistoryEntry }) {
       try {
         const res = await fetch(`/api/orders/${entry.id}?token=${encodeURIComponent(entry.orderToken)}`);
         const json = await res.json();
-        if (!res.ok) throw new Error(json.error ?? "Gagal memuat pesanan");
-        if (alive) setData(json.order);
-      } catch {
+        if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+        if (alive) {
+          setData(json.order);
+          setError(null);
+          cacheOrderStatus(entry.orderNumber, json.order.status);
+        }
+      } catch (err) {
+        // ponytail: log the real cause — a bare generic message hid the 404s before
+        console.error(`[riwayat] gagal memuat status #${entry.orderNumber} (id=${entry.id}):`, err);
         if (alive) setError("Tidak dapat memuat status. Periksa di kasir.");
       }
     }
@@ -39,7 +57,30 @@ function OrderEntry({ entry }: { entry: OrderHistoryEntry }) {
       alive = false;
       clearInterval(t);
     };
-  }, [entry.id, entry.orderNumber, entry.orderToken]);
+  }, [entry.id, entry.orderNumber, entry.orderToken, onGone]);
+
+  // ponytail: a 404 with a correct token means the order is gone from the DB
+  // (e.g. dev DB reset). Clear the stale entry so the user stops seeing the
+  // error on every visit — a failed fetch must NOT delete anything.
+  useEffect(() => {
+    if (!error || data !== null || !entry.id) return;
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/orders/${entry.id}?token=${encodeURIComponent(entry.orderToken)}`);
+        if (alive && res.status === 404) {
+          console.warn(`[riwayat] pesanan #${entry.orderNumber} tidak ada di database — entry dibersihkan`);
+          removeOrderFromHistory(entry.orderNumber);
+          onGone();
+        }
+      } catch {
+        // network hiccup — keep the entry, next poll retries
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [error, data, entry.id, entry.orderNumber, entry.orderToken, onGone]);
 
   return (
     <li className="rounded-2xl border border-surface-2 bg-surface p-4">
@@ -109,14 +150,42 @@ export default function RiwayatPage() {
   useEffect(() => {
     setEntries(getOrderHistory());
     setMounted(true);
+
+    // Re-read storage when a stale entry was removed by a child (404 pruning)
+    const refresh = () => setEntries(getOrderHistory());
+    const prune = () => {
+      pruneFinishedEntries();
+      refresh();
+    };
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") prune();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    // ponytail: pruneFinishedEntries() reads statuses from storage — OrderEntry polls
+    // keep them fresh every 5s, so a 60s sweep is enough for auto-delete after selesai.
+    const interval = setInterval(prune, 60_000);
+    prune(); // drop entries already past 5 minutes on load
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      clearInterval(interval);
+    };
+  }, []);
+
+  // ponytail: stable callback — tanpa ini tiap render parent membuat onGone baru
+  // dan me-restart polling di tiap OrderEntry (deps effect memuat onGone).
+  const handleGone = useCallback(() => {
+    setEntries(getOrderHistory());
   }, []);
 
   return (
     <main className="mx-auto w-full max-w-[480px] px-4 pb-16 pt-8">
       <div className="flex items-center gap-2 text-sm text-muted">
-        <a href="/" className="hover:text-ink">
+        <Link href="/" className="hover:text-ink">
           ← Kembali ke Menu
-        </a>
+        </Link>
       </div>
 
       <h1 className="mt-4 text-2xl font-bold text-ink">Riwayat Pesanan Saya</h1>
@@ -128,17 +197,17 @@ export default function RiwayatPage() {
       ) : entries.length === 0 ? (
         <div className="mt-12 text-center">
           <p className="text-sm text-muted">Belum ada pesanan.</p>
-          <a
+          <Link
             href="/"
             className="mt-4 inline-flex h-11 items-center rounded-full bg-primary px-5 text-sm font-medium text-white hover:opacity-90"
           >
             Kembali ke Menu
-          </a>
+          </Link>
         </div>
       ) : (
         <ul className="mt-4 space-y-3">
           {entries.map((entry) => (
-            <OrderEntry key={entry.orderNumber} entry={entry} />
+            <OrderEntry key={entry.orderNumber} entry={entry} onGone={handleGone} />
           ))}
         </ul>
       )}

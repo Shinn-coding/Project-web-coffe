@@ -33,7 +33,13 @@ interface CartState {
 }
 
 function makeKey(menuItemId: number, sel: CustomizationSelection): string {
-  return `${menuItemId}::${sel.size}|${sel.sugar}|${sel.ice}|${[...(sel.extras ?? [])].sort().join(",")}`;
+  // ponytail: include `choices` — two different group picks (e.g. Besar+Boba vs
+  // Reguler+Selai) must be distinct cart lines, not collide into one key.
+  const choiceKeys = Object.keys(sel.choices ?? {})
+    .sort()
+    .map((g) => `${g}:${[...(sel.choices?.[g] ?? [])].sort().join("+")}`)
+    .join(";");
+  return `${menuItemId}::${sel.size}|${sel.sugar}|${sel.ice}|${[...(sel.extras ?? [])].sort().join(",")}|${choiceKeys}`;
 }
 
 export const useCart = create<CartState>()(

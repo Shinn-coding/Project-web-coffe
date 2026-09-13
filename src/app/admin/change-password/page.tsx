@@ -1,14 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useToasts, ToastHost } from "@/components/ui/toast";
 
 export default function ChangePasswordPage() {
-  const router = useRouter();
   const pushToast = useToasts((s) => s.push);
 
   const [currentPassword, setCurrentPassword] = useState("");

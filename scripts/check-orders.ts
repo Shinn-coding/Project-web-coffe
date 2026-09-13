@@ -18,10 +18,10 @@ async function main() {
 
   for (const o of orders) {
     console.log(
-      `id=${o.id} number=${o.orderNumber} token=${o.token} status=${o.status} customer=${o.customerName} table=${o.tableNumber} total=${o.total} items=${o.items.length}`
+      `id=${o.id} number=${o.orderNumber} token=${o.orderToken} status=${o.status} customer=${o.customerName} table=${o.tableNumber} total=${o.totalPrice} items=${o.items.length}`
     );
     for (const i of o.items) {
-      console.log(`  item: ${i.name} qty=${i.quantity} price=${i.price}`);
+      console.log(`  item: ${i.itemName} qty=${i.quantity} price=${i.unitPrice} menuItemId=${i.menuItemId ?? "null"}`);
     }
   }
 }

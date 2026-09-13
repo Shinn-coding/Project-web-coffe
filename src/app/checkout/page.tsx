@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { formatRupiah } from "@/lib/format";
 import { useCart, cartCount, cartSubtotal } from "@/lib/store/cart";
-import type { CartLineInput } from "@/lib/types";
 import { addOrderToHistory } from "@/lib/order-history";
 
 export default function CheckoutPage() {
@@ -41,7 +40,7 @@ export default function CheckoutPage() {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const payload: { customerName: string; tableNumber?: string; items: CartLineInput[] } = {
+      const payload: { customerName: string; tableNumber?: string; items: unknown[] } = {
         customerName: name.trim(),
         items: items.map((i) => ({
           menuItemId: i.menuItemId,

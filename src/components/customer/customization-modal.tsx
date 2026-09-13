@@ -8,7 +8,7 @@ import { Stepper } from "@/components/ui/stepper";
 import { Spinner } from "@/components/ui/spinner";
 import { formatRupiah } from "@/lib/format";
 import {
-  parseOptions,
+  normalizeOptions,
   selectionDelta,
   defaultSelection,
   type CustomizationSelection,
@@ -25,7 +25,7 @@ export function CustomizationModal({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const opts = parseOptions(item.customizationOptions);
+  const opts = normalizeOptions(item.customizationOptions);
   // Parent renders <CustomizationModal key={item.id}> so state resets per item
   const [sel, setSel] = useState<CustomizationSelection>(() => defaultSelection(opts));
   const [adding, setAdding] = useState(false);
@@ -33,15 +33,6 @@ export function CustomizationModal({
 
   const delta = selectionDelta(opts, sel);
   const lineTotal = (item.price + delta) * sel.quantity;
-
-  function toggleExtra(name: string) {
-    setSel((s) => ({
-      ...s,
-      extras: s.extras.includes(name)
-        ? s.extras.filter((e) => e !== name)
-        : [...s.extras, name],
-    }));
-  }
 
   function handleAdd() {
     setAdding(true);
@@ -68,72 +59,60 @@ export function CustomizationModal({
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-5">
-        {/* Size */}
-        {opts.sizes && opts.sizes.length > 0 && (
-          <Group label="Ukuran">
-            <Segmented
-              options={opts.sizes.map((s) => ({
-                value: s.name,
-                label: s.name + (s.priceDelta ? ` +${formatRupiah(s.priceDelta).replace("Rp ", "Rp ")}` : ""),
-              }))}
-              value={sel.size}
-              onChange={(v) => setSel((s) => ({ ...s, size: v }))}
-            />
+        {/* Canonical groups (new admin builder + legacy menus mapped via normalizeOptions) */}
+        {opts.groups?.map((g) => (
+          <Group key={g.id} label={g.name}>
+            {g.type === "single" ? (
+              <Segmented
+                options={g.options.map((o) => ({
+                  value: o.name,
+                  label: o.name + (o.priceDelta ? ` +${formatRupiah(o.priceDelta)}` : ""),
+                }))}
+                value={sel.choices?.[g.id]?.[0] ?? ""}
+                onChange={(v) =>
+                  setSel((s) => ({ ...s, choices: { ...s.choices, [g.id]: [v] } }))
+                }
+              />
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {g.options.map((o) => {
+                  const active = (sel.choices?.[g.id] ?? []).includes(o.name);
+                  return (
+                    <button
+                      key={o.name}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() =>
+                        setSel((s) => {
+                          const cur = s.choices?.[g.id] ?? [];
+                          return {
+                            ...s,
+                            choices: {
+                              ...s.choices,
+                              [g.id]: active ? cur.filter((c) => c !== o.name) : [...cur, o.name],
+                            },
+                          };
+                        })
+                      }
+                      className={cn(
+                        "inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-sm font-medium transition-colors cursor-pointer",
+                        active
+                          ? "bg-primary/10 text-on-primary-soft border border-primary"
+                          : "bg-white border border-border text-on-surface hover:bg-surface-2"
+                      )}
+                    >
+                      {active && <span aria-hidden="true" className="h-2 w-2 rounded-full bg-primary" />}
+                      {o.name}
+                      {o.priceDelta > 0 && (
+                        <span className="text-muted text-xs">+{formatRupiah(o.priceDelta)}</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </Group>
-        )}
-
-        {/* Sugar */}
-        {opts.sugarLevels && opts.sugarLevels.length > 0 && (
-          <Group label="Level Gula">
-            <Segmented
-              options={opts.sugarLevels.map((s) => ({ value: s, label: s }))}
-              value={sel.sugar}
-              onChange={(v) => setSel((s) => ({ ...s, sugar: v }))}
-            />
-          </Group>
-        )}
-
-        {/* Ice */}
-        {opts.iceLevels && opts.iceLevels.length > 0 && (
-          <Group label="Es">
-            <Segmented
-              options={opts.iceLevels.map((s) => ({ value: s, label: s }))}
-              value={sel.ice}
-              onChange={(v) => setSel((s) => ({ ...s, ice: v }))}
-            />
-          </Group>
-        )}
-
-        {/* Extras */}
-        {opts.extras && opts.extras.length > 0 && (
-          <Group label="Tambahan">
-            <div className="flex flex-wrap gap-2">
-              {opts.extras.map((ex) => {
-                const active = sel.extras.includes(ex.name);
-                return (
-                  <button
-                    key={ex.name}
-                    type="button"
-                    aria-pressed={active}
-                    onClick={() => toggleExtra(ex.name)}
-                    className={cn(
-                      "inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-sm font-medium transition-colors cursor-pointer",
-                      active
-                        ? "bg-primary/10 text-on-primary-soft border border-primary"
-                        : "bg-white border border-border text-on-surface hover:bg-surface-2"
-                    )}
-                  >
-                    {active && <span aria-hidden="true" className="h-2 w-2 rounded-full bg-primary" />}
-                    {ex.name}
-                    {ex.priceDelta > 0 && (
-                      <span className="text-muted text-xs">+{formatRupiah(ex.priceDelta)}</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </Group>
-        )}
+        ))}
 
         {/* Quantity */}
         <Group label="Jumlah">
