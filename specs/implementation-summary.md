@@ -19,12 +19,12 @@ Admin login: `admin` / `admin123` (at `/admin/login`).
 | --- | --- | --- |
 | `/` | Server → client (`MenuClient`) | Menu: search (300ms debounce), category chips, cards, customization modal, cart drawer, sticky cart bar |
 | `/checkout` | client | Name + optional table, order summary, POST → `/api/orders` |
-| `/order/[id]` | client | Success receipt, status timeline (Baru→Diproses→Siap→Selesai), polls `/api/orders/[id]` every 5s |
+| `/order/[id]` | server → client (`tracking-client`) | Success receipt + current status are **server-rendered** (token-gated; useful even where client scripts are blocked, e.g. preview sandboxes forcing `script-src 'none'`), then real-time via token-gated SSE `/api/orders/[id]/stream` (slow poll only as fallback; auto-closes on `selesai`) |
 | `/admin/login` | client | Session login (signed-cookie HMAC, 8h) |
 | `/admin` | client | Dashboard: today's orders/revenue/waiting + top product + recent orders (auto-refresh 10s) |
-| `/admin/orders` | client | Inbox: advance status forward only; order-inbox live via SSE (8s poll fallback), new-order toast pulse |
+| `/admin/orders` | client | Inbox: advance status forward only; order-inbox live via SSE (8s poll fallback), new-order toast pulse; orders grouped under `orderDate` headings ("Hari Ini" / "Kemarin" / full date), newest day first |
 | `/admin/menu` | client | CRUD: availability switch, edit modal, delete, JSON customization options |
-| `/admin/reports` | client | Date range: totals, daily revenue char, top products |
+| `/admin/reports` | client | Quick ranges + date inputs: dashboard-style stat cards, clean daily revenue bar chart (orderDate buckets, per-day order counts in tooltip), top products with bar indicators |
 | API | see `api-contract.md` | `/api/menu`, `/api/menu/[id]`, `/api/orders`, `/api/orders/[id]`, `/api/admin/{login,logout,session,menu,orders,stats,reports}`, `/api/admin/orders/stream` |
 
 ## State & Data Handling
@@ -38,6 +38,8 @@ Admin login: `admin` / `admin123` (at `/admin/login`).
 - **Input hardening**: `available` on menu PUT is type-checked (`typeof === "boolean"`); all `[id]` routes reject non-integer IDs with 404; `.env*` added to `.gitignore`.
 - **Status advance is forward-only** (`nextStatus` in `src/lib/format.ts`): Baru → Diproses → Siap Diambil → Selesai; admin PATCH rejects skips.
 - New-order real-time: `POST /api/orders` triggers `emitNewOrder` → SSE `/api/admin/orders/stream` → EventSource on `/admin/orders` inbox table (toast + live row); 8s poll stays as fallback.
+- **Customer status real-time (per-order, private)**: `PATCH /api/admin/orders/[id]` triggers `emitOrderStatus` → SSE `/api/orders/[id]/stream?token=…` — a **token-gated channel per order** (validated before the stream opens; wrong token → 404), so a customer only ever receives frames for their own order, never a global broadcast. Both tracking page and riwayat use `useOrderStatusStream` (`src/lib/use-order-status-stream.ts`): on `selesai` the client closes its EventSource and the server closes all subscriber streams (status is final — no idle connections/battery drain); while the stream is down a slow 15–20s fallback poll runs instead of the old chatty 5s loop; finished orders refuse new streams with 410.
+- Admin Pesanan + Laporan bucket by `orderDate` (shop-local `YYYY-MM-DD` keys, same as the order-number sequence) — not UTC `createdAt` — via `localDateKey`/`orderDateLabel` in `src/lib/format.ts` (deterministic, hydration-safe labels).
 - **Admin auth**: signed cookie `admin_session` (HMAC-SHA256 + `timingSafeEqual`, `AUTH_SECRET`, 8h expiry). Server-side guard `requireAdmin()` on admin API routes; `/admin` pages guard via client-side `/api/admin/session` fetch (layout skips `/admin/login`).
 
 ## Key Files

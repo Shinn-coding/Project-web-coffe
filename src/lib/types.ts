@@ -32,6 +32,7 @@ export interface OrderItemDto {
 export interface OrderDto {
   id: number;
   orderNumber: string;
+  orderDate: string; // "YYYY-MM-DD" local date the order was placed
   customerName: string | null;
   tableNumber: string | null;
   status: OrderStatus;

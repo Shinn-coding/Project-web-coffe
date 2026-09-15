@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { clients } from "@/lib/order-stream";
+import { addAdminClientWithHeartbeat, removeAdminClient, HEARTBEAT_MS } from "@/lib/order-stream";
 import { requireAdmin } from "@/lib/admin-guard";
 
 // ponytail: in-process broadcaster. If this app ever scales horizontally,
@@ -18,13 +18,23 @@ export async function GET() {
   const stream = new ReadableStream({
     start(controller) {
       controllerRef = controller;
-      clients.add(controller);
+      addAdminClientWithHeartbeat(controller);
       // tell reconnecting clients the backoff (in ms) before the first retry
-      controller.enqueue(encoder.encode("retry: 3000\n\n"));
+      controller.enqueue(encoder.encode(`retry: 3000\n\n`));
+      // immediate keepalive — flushes headers/buffers and starts the liveness clock
+      controller.enqueue(encoder.encode(`: ping ${Date.now()}\n\n`));
+      // keep the event loop alive so heartbeats fire while subscribers exist
+      setInterval(() => {
+        try {
+          controller.enqueue(encoder.encode(`: ping ${Date.now()}\n\n`));
+        } catch {
+          removeAdminClient(controllerRef!);
+        }
+      }, HEARTBEAT_MS);
     },
     cancel() {
       if (controllerRef) {
-        clients.delete(controllerRef);
+        removeAdminClient(controllerRef);
       }
     },
   });

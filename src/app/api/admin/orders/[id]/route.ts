@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/admin-guard";
 import { nextStatus } from "@/lib/format";
+import { emitOrderStatus } from "@/lib/order-stream";
 
 export const dynamic = "force-dynamic";
 
@@ -46,5 +47,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     data: { status: finalStatus as typeof order.status },
     include: { items: true },
   });
+
+  // Real-time push to the customer's tracking page / riwayat — token-gated per
+  // order, so only the owner's open streams receive this (see /api/orders/[id]/stream).
+  emitOrderStatus(updated);
+
   return NextResponse.json({ success: true, data: updated });
 }

@@ -1,13 +1,87 @@
 "use client";
 
 import * as React from "react";
-import { useState, useEffect, useCallback, useRef } from "react";
-import { ArrowRight, BellRing } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { ArrowRight, BellRing, CalendarDays } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useToasts, ToastHost } from "@/components/ui/toast";
-import { formatRupiah, nextStatus, STATUS_LABEL, type StatusKey } from "@/lib/format";
+import { formatRupiah, localDateKey, orderDateLabel, nextStatus, STATUS_LABEL, type StatusKey } from "@/lib/format";
 import type { OrderDto } from "@/lib/types";
+
+/**
+ * Group orders by their orderDate key ("YYYY-MM-DD"), newest day first.
+ * Within each day the original ordering (active first, newest first) is kept.
+ */
+function groupByDate(orders: OrderDto[]): { date: string; label: string; orders: OrderDto[] }[] {
+  const map = new Map<string, OrderDto[]>();
+  for (const o of orders) {
+    const key = o.orderDate || localDateKey(new Date(o.createdAt)); // legacy rows fallback
+    const list = map.get(key);
+    if (list) list.push(o);
+    else map.set(key, [o]);
+  }
+  return [...map.entries()]
+    .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+    .map(([date, list]) => ({ date, label: orderDateLabel(date), orders: list }));
+}
+
+function OrderCard({
+  o,
+  advancing,
+  onAdvance,
+}: {
+  o: OrderDto;
+  advancing: boolean;
+  onAdvance: (o: OrderDto) => void;
+}) {
+  const next = nextStatus(o.status);
+  return (
+    <li className="rounded-[var(--radius-md)] border border-border bg-surface p-4 flex flex-col gap-3">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="text-lg font-bold text-primary">#{o.orderNumber}</p>
+          <p className="text-sm text-on-surface">
+            {o.customerName}
+            {o.tableNumber ? ` · Meja ${o.tableNumber}` : ""}
+            <span className="text-muted"> · {formatRupiah(o.totalPrice)}</span>
+          </p>
+        </div>
+        <StatusBadge status={o.status} />
+      </div>
+      <ul className="divide-y divide-border/70 rounded-[var(--radius-sm)] bg-bg px-3">
+        {o.items.map((it) => {
+          let s: string[] = [];
+          try {
+            if (Array.isArray(JSON.parse(it.customization))) s = JSON.parse(it.customization);
+          } catch {
+            s = [];
+          }
+          return (
+            <li key={it.id} className="py-2 text-sm">
+              <p className="font-medium text-ink">
+                {it.itemName} <span className="text-muted">×{it.quantity}</span>
+              </p>
+              {s.length > 0 && <p className="text-xs text-muted">{s.join(" · ")}</p>}
+            </li>
+          );
+        })}
+      </ul>
+      {next && (
+        <button
+          type="button"
+          onClick={() => onAdvance(o)}
+          disabled={advancing}
+          className="inline-flex items-center justify-center gap-1.5 rounded-full bg-primary px-4 py-2.5 text-sm font-medium text-primary-fg hover:bg-primary-hover disabled:opacity-50 transition-colors cursor-pointer self-start"
+        >
+          {advancing && <Spinner size={14} />}
+          Lanjutkan ke {STATUS_LABEL[next as StatusKey]}
+          <ArrowRight className="h-4 w-4" aria-hidden="true" />
+        </button>
+      )}
+    </li>
+  );
+}
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<OrderDto[]>([]);
@@ -47,7 +121,9 @@ export default function AdminOrdersPage() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 8000);
+    // ponytail: safety-net poll only — the SSE listener below reloads the list
+    // instantly on every new order, so this cadence no longer gates latency.
+    const t = setInterval(load, 4000);
     return () => clearInterval(t);
   }, [load]);
 
@@ -57,9 +133,12 @@ export default function AdminOrdersPage() {
       const data = JSON.parse((e as MessageEvent).data) as { id: string; orderNumber: string; status: string };
       knownIds.current.add(Number(data.id));
       if (data.status === "baru") pushToast(`Pesanan baru #${data.orderNumber}!`);
+      // Instant refresh — previously the new row only appeared on the next
+      // 8s poll, which made the order feel "delayed" at the cashier.
+      void load();
     });
     return () => es.close();
-  }, [pushToast]);
+  }, [pushToast, load]);
 
   async function advance(o: OrderDto) {
     const next = nextStatus(o.status);
@@ -81,6 +160,18 @@ export default function AdminOrdersPage() {
     }
   }
 
+  // Derived data + hooks stay above the early return so hook order is stable
+  // across renders. No cap on finished orders: older-day groups must stay
+  // visible (history is only hidden behind an explicit date filter, never
+  // silently).
+  const active = orders.filter((o) => o.status !== "selesai");
+  const done = orders.filter((o) => o.status === "selesai");
+
+  // Date groups — recompute only when the order list changes.
+  const groups = useMemo(() => groupByDate(orders), [orders]);
+  const doneGroups = useMemo(() => groupByDate(done), [done]);
+  const doneGroupList = useMemo(() => doneGroups.filter((g) => g.orders.length > 0), [doneGroups]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -89,9 +180,6 @@ export default function AdminOrdersPage() {
       </div>
     );
   }
-
-  const active = orders.filter((o) => o.status !== "selesai");
-  const done = orders.filter((o) => o.status === "selesai").slice(0, 10);
 
   return (
     <div className="flex flex-col gap-6">
@@ -116,72 +204,47 @@ export default function AdminOrdersPage() {
         </p>
       ) : (
         <>
-          {/* Active orders */}
-          <section aria-label="Pesanan aktif">
-            <h2 className="text-sm font-semibold text-on-surface mb-2">Sedang Diproses</h2>
-            <ul className="flex flex-col gap-3">
-              {active.map((o) => {
-                const next = nextStatus(o.status);
-                return (
-                  <li
-                    key={o.id}
-                    className="rounded-[var(--radius-md)] border border-border bg-surface p-4 flex flex-col gap-3"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="text-lg font-bold text-primary">#{o.orderNumber}</p>
-                        <p className="text-sm text-on-surface">
-                          {o.customerName}
-                          {o.tableNumber ? ` · Meja ${o.tableNumber}` : ""}
-                          <span className="text-muted"> · {formatRupiah(o.totalPrice)}</span>
-                        </p>
-                      </div>
-                      <StatusBadge status={o.status} />
-                    </div>
-                    <ul className="divide-y divide-border/70 rounded-[var(--radius-sm)] bg-bg px-3">
-                      {o.items.map((it) => {
-                        let specs: string[] = [];
-                        try {
-                          if (Array.isArray(JSON.parse(it.customization))) specs = JSON.parse(it.customization);
-                        } catch {
-                          specs = [];
-                        }
-                        return (
-                          <li key={it.id} className="py-2 text-sm">
-                            <p className="font-medium text-ink">
-                              {it.itemName} <span className="text-muted">×{it.quantity}</span>
-                            </p>
-                            {specs.length > 0 && (
-                              <p className="text-xs text-muted">{specs.join(" · ")}</p>
-                            )}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                    {next && (
-                      <button
-                        type="button"
-                        onClick={() => advance(o)}
-                        disabled={advancing === o.id}
-                        className="inline-flex items-center justify-center gap-1.5 rounded-full bg-primary px-4 py-2.5 text-sm font-medium text-primary-fg hover:bg-primary-hover disabled:opacity-50 transition-colors cursor-pointer self-start"
-                      >
-                        {advancing === o.id && <Spinner size={14} />}
-                        Lanjutkan ke {STATUS_LABEL[next as StatusKey]}
-                        <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                      </button>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
+          {/* Active orders — grouped by order date, newest day first */}
+          {groups.map((g) => {
+            const dayActive = g.orders.filter((o) => o.status !== "selesai");
+            if (dayActive.length === 0) return null;
+            return (
+              <section key={g.date} aria-label={`Pesanan aktif ${g.label}`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <CalendarDays className="h-4 w-4 text-muted" aria-hidden="true" />
+                  <h2 className="text-sm font-semibold text-on-surface">
+                    {g.label}
+                    <span className="ml-1.5 font-normal text-muted">
+                      {g.date.split("-").reverse().join("/")}
+                    </span>
+                  </h2>
+                  <span className="inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted">
+                    {dayActive.length} aktif
+                  </span>
+                </div>
+                <ul className="flex flex-col gap-3">
+                  {dayActive.map((o) => (
+                    <OrderCard key={o.id} o={o} advancing={advancing === o.id} onAdvance={advance} />
+                  ))}
+                </ul>
+              </section>
+            );
+          })}
 
-          {/* Done */}
-          {done.length > 0 && (
-            <section aria-label="Pesanan selesai">
-              <h2 className="text-sm font-semibold text-on-surface mb-2">Selesai</h2>
+          {/* Done — grouped by order date as well, newest day first */}
+          {doneGroupList.map((g) => (
+            <section key={g.date} aria-label={`Pesanan selesai ${g.label}`}>
+              <div className="flex items-center gap-2 mb-2">
+                <CalendarDays className="h-4 w-4 text-muted" aria-hidden="true" />
+                <h2 className="text-sm font-semibold text-on-surface">
+                  Selesai · {g.label}
+                  <span className="ml-1.5 font-normal text-muted">
+                    {g.date.split("-").reverse().join("/")}
+                  </span>
+                </h2>
+              </div>
               <ul className="divide-y divide-border rounded-[var(--radius-md)] border border-border bg-surface px-4">
-                {done.map((o) => (
+                {g.orders.map((o) => (
                   <li key={o.id} className="flex items-center justify-between gap-2 py-3">
                     <p className="font-medium text-ink">
                       #{o.orderNumber} <span className="text-muted font-normal">· {o.customerName}</span>
@@ -194,7 +257,7 @@ export default function AdminOrdersPage() {
                 ))}
               </ul>
             </section>
-          )}
+          ))}
         </>
       )}
 

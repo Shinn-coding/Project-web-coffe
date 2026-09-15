@@ -61,7 +61,8 @@ model MenuItem {
 
 model Order {
   id           Int         @id @default(autoincrement())
-  orderNumber  String      @unique // Display number for customer, e.g. "A042"
+  orderNumber  String      // Display number for customer, e.g. "0042" — unique per orderDate, see @@unique below
+  orderDate    String      // "YYYY-MM-DD" local date, used to reset orderNumber sequence daily
   orderToken   String      @unique // Unguessable guest tracking token (crypto.randomUUID)
   customerName String?
   tableNumber  String?
@@ -76,6 +77,7 @@ model Order {
   @@index([status])
   @@index([createdAt])
   @@index([status, createdAt]) // Composite: "show all pending orders today"
+  @@unique([orderDate, orderNumber]) // orderNumber resets daily, unique only within same day
 }
 
 model OrderItem {

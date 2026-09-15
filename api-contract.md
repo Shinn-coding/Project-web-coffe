@@ -35,6 +35,9 @@ Order: { id: number; orderNumber: string; orderToken: string; customerName: stri
 ### `GET /api/orders/[id]?token=…` → `{ order: Order }` | 404
 Requires the `orderToken` returned at creation. Missing/wrong token → 404 (order existence not revealed). Non-integer `id` → 404.
 
+### `GET /api/orders/[id]/stream?token=…` → SSE `status-update` events | 404/410
+Real-time order status for the customer tracking page and riwayat. **Privacy: per-order channel** — the `orderToken` is validated before the stream opens; wrong/missing token → 404. The stream carries `event: status-update` frames `{ id, orderNumber, status }` for **this order only** (never a global broadcast). Resource-frugal: finished orders (`selesai`) are refused with **410** (nothing can change), and the server closes every subscriber stream right after pushing the final `selesai` frame — clients also auto-close their EventSource on that event. Retry backoff is announced as `retry: 3000`.
+
 ## Admin (cookie-auth; 401 if missing/invalid)
 
 ### `POST /api/admin/login` → `{ user }` + Set-Cookie | 401 wrong creds | 429 rate-limited
@@ -53,10 +56,10 @@ Requires the `orderToken` returned at creation. Missing/wrong token → 404 (ord
 
 ### `DELETE /api/admin/menu/[id]` → `{ success: true }` | 404
 
-### `GET /api/admin/orders` → `{ data: Order[] }` (newest first, max 100, items included)
+### `GET /api/admin/orders` → `{ data: Order[] }` (newest first, full history — no row cap, items included)
 
 ### `PATCH /api/admin/orders/[id]` → `{ data: Order }` | 400/404
-`{ status }` — **forward-only**: new status must equal `nextStatus(current)`; 400 otherwise. Selesai is terminal.
+`{ status }` — **forward-only**: new status must equal `nextStatus(current)`; 400 otherwise. Selesai is terminal. Every successful update also pushes a token-gated `status-update` SSE frame to the customer's `/api/orders/[id]/stream` subscribers.
 
 ### `GET /api/admin/stats` → `{ data: Stats }`
 ```ts
@@ -66,12 +69,13 @@ Requires the `orderToken` returned at creation. Missing/wrong token → 404 (ord
 ```
 
 ### `GET /api/admin/reports?from=YYYY-MM-DD&to=YYYY-MM-DD` → `{ data: Report }`
+Filtering/bucketing uses `orderDate` (shop-local "YYYY-MM-DD" keys, same as the order-number sequence) — not UTC `createdAt`. `from`/`to` default to today; both must be `YYYY-MM-DD`.
 ```ts
-{ totalOrders: number; revenue: number; avgOrder: number;
+{ from: string; to: string; totalOrders: number; revenue: number; avgOrder: number;
   topProducts: { name; quantity; revenue }[];  // top 8
-  daily: { date: string /*YYYY-MM-DD*/; revenue: number }[] }
+  daily: { date: string /*YYYY-MM-DD*/; revenue: number; orders: number }[] }
 ```
 
 ## Status Flow
 `baru` → `diproses` → `siap_diambil` → `selesai` (labels/colors in `src/lib/format.ts`).
-`orderNumber` = zero-padded day sequence (`#0001`…).
+`orderNumber` = zero-padded day sequence (`#0001`…), unique per `orderDate` (`@@unique([orderDate, orderNumber])`). The admin Pesanan page groups orders under `orderDate` headings ("Hari Ini", "Kemarin", full date) via `orderDateLabel` in `src/lib/format.ts`.

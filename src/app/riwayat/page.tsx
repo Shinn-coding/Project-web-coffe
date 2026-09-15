@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 import { Spinner } from "@/components/ui/spinner";
@@ -13,13 +13,51 @@ import {
   cacheOrderStatus,
   type OrderHistoryEntry,
 } from "@/lib/order-history";
+import { useOrderStatusStream } from "@/lib/use-order-status-stream";
 import type { OrderDto } from "@/lib/types";
 
-const POLL_MS = 5000;
+/**
+ * Safety-net poll while waiting for the SSE stream to prove itself live.
+ * Once live (or finished), polling stops — the SSE heartbeat watchdog in
+ * useOrderStatusStream restarts polling only while the stream is down.
+ */
+const POLL_MS = 4000;
 
 function OrderEntry({ entry, onGone }: { entry: OrderHistoryEntry; onGone: () => void }) {
   const [data, setData] = useState<OrderDto | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [finished, setFinished] = useState(false);
+  const [live, setLive] = useState(false); // SSE frame received
+  const [alive, setAlive] = useState(false); // entry confirmed on the server
+  const finishedRef = useRef(false);
+  const liveRef = useRef(false);
+
+  useEffect(() => {
+    finishedRef.current = finished;
+  }, [finished]);
+  useEffect(() => {
+    liveRef.current = live;
+  }, [live]);
+
+  const applyStatus = useCallback(
+    (status: string) => {
+      setData((prev) => (prev ? { ...prev, status: status as OrderDto["status"] } : prev));
+      cacheOrderStatus(entry.orderNumber, status);
+      if (status === "selesai") setFinished(true);
+    },
+    [entry.orderNumber],
+  );
+
+  // Real-time status push — token-gated SSE for THIS order only, auto-closes
+  // on "selesai". Enabled once the entry is confirmed alive; disabled once
+  // finished so no connection/poll keeps running for a done order.
+  useOrderStatusStream({
+    orderId: entry.id,
+    orderToken: entry.orderToken,
+    enabled: alive && !finished,
+    onEvent: applyStatus,
+    onLive: useCallback(() => setLive(true), []),
+  });
 
   useEffect(() => {
     if (!entry.id) {
@@ -43,6 +81,9 @@ function OrderEntry({ entry, onGone }: { entry: OrderHistoryEntry; onGone: () =>
           setData(json.order);
           setError(null);
           cacheOrderStatus(entry.orderNumber, json.order.status);
+          if (!alive) setAlive(true);
+          // status may have become "selesai" between renders
+          if (json.order.status === "selesai") setFinished(true);
         }
       } catch (err) {
         // ponytail: log the real cause — a bare generic message hid the 404s before
@@ -52,11 +93,27 @@ function OrderEntry({ entry, onGone }: { entry: OrderHistoryEntry; onGone: () =>
     }
 
     fetchOrder();
-    const t = setInterval(fetchOrder, POLL_MS);
+
+    // Safety-net poll ONLY until the first server confirmation or a live SSE
+    // frame; afterwards SSE (with its watchdog) owns freshness. A finished
+    // order never polls again.
+    let t: ReturnType<typeof setInterval> | null = null;
+    if (!finished) {
+      t = setInterval(() => {
+        if (finishedRef.current || liveRef.current) {
+          if (t) clearInterval(t);
+          return;
+        }
+        void fetchOrder();
+      }, POLL_MS);
+    }
     return () => {
       alive = false;
-      clearInterval(t);
+      if (t) clearInterval(t);
     };
+    // `finished`/`live` intentionally not in deps: the refs below track them
+    // without tearing down the interval on every status change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entry.id, entry.orderNumber, entry.orderToken, onGone]);
 
   // ponytail: a 404 with a correct token means the order is gone from the DB
@@ -163,8 +220,9 @@ export default function RiwayatPage() {
     };
     document.addEventListener("visibilitychange", onVisible);
 
-    // ponytail: pruneFinishedEntries() reads statuses from storage — OrderEntry polls
-    // keep them fresh every 5s, so a 60s sweep is enough for auto-delete after selesai.
+    // ponytail: pruneFinishedEntries() reads statuses from storage — OrderEntry
+    // keeps them fresh via SSE (poll fallback), so a 60s sweep is enough for
+    // auto-delete after selesai.
     const interval = setInterval(prune, 60_000);
     prune(); // drop entries already past 5 minutes on load
 

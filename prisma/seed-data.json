@@ -1,5 +1,5 @@
 {
-  "exportedAt": "2026-09-13T09:46:28.341Z",
+  "exportedAt": "2026-09-14T01:54:48.116Z",
   "categories": [
     {
       "name": "Kopi",
@@ -120,7 +120,7 @@
       "price": 18000,
       "imageUrl": "https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=400&h=400&fit=crop&auto=format",
       "available": true,
-      "customizationOptions": "{\"extras\":[{\"name\":\"Mentega Ekstra\",\"priceDelta\":2000},{\"name\":\"Selai\",\"priceDelta\":3000}]}",
+      "customizationOptions": "{\"groups\":[{\"id\":\"g-0-tambahan\",\"name\":\"Tambahan\",\"type\":\"single\",\"options\":[{\"name\":\"Tanpa tambahan\",\"priceDelta\":0},{\"name\":\"Selai\",\"priceDelta\":3000},{\"name\":\"Mentega Ekstra\",\"priceDelta\":2000}]}]}",
       "categoryName": "Pastry & Snack"
     },
     {
@@ -129,7 +129,7 @@
       "price": 16000,
       "imageUrl": "https://i.pinimg.com/1200x/af/82/3b/af823be8195ddfd8f7330c6f9a8f4105.jpg",
       "available": true,
-      "customizationOptions": "{\"groups\":[{\"id\":\"g-0-tambahan\",\"name\":\"Tambahan\",\"type\":\"multiple\",\"options\":[{\"name\":\"Mentega Ekstra\",\"priceDelta\":2000},{\"name\":\"Selai\",\"priceDelta\":3000}]}]}",
+      "customizationOptions": "{\"groups\":[{\"id\":\"g-0-tambahan\",\"name\":\"Tambahan\",\"type\":\"single\",\"options\":[{\"name\":\"Tanpa tambahan\",\"priceDelta\":0},{\"name\":\"Selai\",\"priceDelta\":3000},{\"name\":\"Mentega ekstra\",\"priceDelta\":2000}]}]}",
       "categoryName": "Pastry & Snack"
     },
     {
@@ -138,7 +138,7 @@
       "price": 23000,
       "imageUrl": "https://images.unsplash.com/photo-1524351199678-941a58a3df50?w=400&h=400&fit=crop&auto=format",
       "available": true,
-      "customizationOptions": "{\"extras\":[{\"name\":\"Mentega Ekstra\",\"priceDelta\":2000},{\"name\":\"Selai\",\"priceDelta\":3000}]}",
+      "customizationOptions": "{\"groups\":[{\"id\":\"g-0-tambahan\",\"name\":\"Tambahan\",\"type\":\"single\",\"options\":[{\"name\":\"tanpa tambahan\",\"priceDelta\":0},{\"name\":\"Selai\",\"priceDelta\":3000},{\"name\":\"Toping keju\",\"priceDelta\":2000}]}]}",
       "categoryName": "Pastry & Snack"
     },
     {
@@ -147,7 +147,7 @@
       "price": 20000,
       "imageUrl": "https://images.unsplash.com/photo-1509365465985-25d11c17e812?w=400&h=400&fit=crop&auto=format",
       "available": true,
-      "customizationOptions": "{\"extras\":[{\"name\":\"Mentega Ekstra\",\"priceDelta\":2000},{\"name\":\"Selai\",\"priceDelta\":3000}]}",
+      "customizationOptions": "{\"groups\":[{\"id\":\"g-0-tambahan\",\"name\":\"Tambahan\",\"type\":\"single\",\"options\":[{\"name\":\"Tanpa Tambahan\",\"priceDelta\":0},{\"name\":\"Selai\",\"priceDelta\":3000},{\"name\":\"Mentega Ekstra\",\"priceDelta\":2000}]}]}",
       "categoryName": "Pastry & Snack"
     },
     {
@@ -156,7 +156,7 @@
       "price": 22000,
       "imageUrl": "https://i.pinimg.com/736x/0a/10/d5/0a10d507d0c4d05fde3d62037bbab567.jpg",
       "available": true,
-      "customizationOptions": "{\"groups\":[{\"id\":\"g-0-tambahan\",\"name\":\"Tambahan\",\"type\":\"single\",\"options\":[{\"name\":\"Mentega Ekstra\",\"priceDelta\":2000},{\"name\":\"Selai\",\"priceDelta\":3000}]}]}",
+      "customizationOptions": "{\"groups\":[{\"id\":\"g-0-tambahan\",\"name\":\"Tambahan\",\"type\":\"single\",\"options\":[{\"name\":\"Tanpa tambahan\",\"priceDelta\":0},{\"name\":\"Selai\",\"priceDelta\":3000},{\"name\":\"Mentega ekstra\",\"priceDelta\":2000}]}]}",
       "categoryName": "Pastry & Snack"
     }
   ]
