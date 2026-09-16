@@ -32,6 +32,23 @@ export default function TrackingClient({
   const [down, setDown] = React.useState(false);
   const [done, setDone] = React.useState(initialOrder?.status === "selesai");
 
+  // ponytail: track which steps JUST got checked by a real-time update so the
+  // checkmark can replay its pop animation — without this, React reuses the
+  // same <Check> element and an SSE status change would feel instant/stiff.
+  // Only the initial mount is excluded (SSR renders no icons → no hydration
+  // mismatch); re-pops on later remounts are a fair trade for liveliness.
+  const [justChecked, setJustChecked] = React.useState<number>(-1);
+  const firstStatusRef = React.useRef(true);
+  React.useEffect(() => {
+    if (!order) return;
+    if (firstStatusRef.current) {
+      firstStatusRef.current = false;
+      return;
+    }
+    const idx = STATUS_ORDER.indexOf(order.status as StatusKey);
+    if (idx >= 0) setJustChecked(idx);
+  }, [order?.status]); // eslint-disable-line react-hooks/exhaustive-deps -- hanya status yang memicu pop
+
   // Safety-net poll: only until the SSE stream proves itself live; never for
   // a finished order (nothing can change anymore).
   React.useEffect(() => {
@@ -121,7 +138,7 @@ export default function TrackingClient({
               "Pesanan selesai — terima kasih! Sudah tidak ada pembaruan status."
             ) : live ? (
               <>
-                <Wifi className="h-3.5 w-3.5 text-accent" aria-hidden="true" />
+                <Wifi className="live-pulse h-3.5 w-3.5 text-accent" aria-hidden="true" />
                 Pembaruan status langsung (real-time)
               </>
             ) : (
@@ -158,20 +175,26 @@ export default function TrackingClient({
                 {i < STATUS_ORDER.length - 1 && (
                   <span
                     aria-hidden="true"
-                    className={`absolute left-[11px] top-6 h-full w-0.5 ${i < currentStep ? "bg-accent" : "bg-border"}`}
+                    className={`step-connector absolute left-[11px] top-6 h-full w-0.5 ${
+                      i < currentStep ? "step-connector-filled bg-accent" : "bg-border"
+                    }`}
                   />
                 )}
                 <span
-                  className={`relative mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${
+                  className={`step-dot-done relative mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${
                     doneStep
                       ? "border-accent bg-accent text-white"
                       : current
-                        ? "border-primary bg-white text-primary"
+                        ? "step-pulse border-primary bg-white text-primary"
                         : "border-border bg-white text-muted"
                   }`}
                 >
                   {doneStep ? (
-                    <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                    <Check
+                      key={`step-${i}-${justChecked}`}
+                      className={`h-3.5 w-3.5 ${i === justChecked ? "check-pop" : ""}`}
+                      aria-hidden="true"
+                    />
                   ) : current ? (
                     <Clock className="h-3.5 w-3.5" aria-hidden="true" />
                   ) : (

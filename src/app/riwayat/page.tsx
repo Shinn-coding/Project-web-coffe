@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 
 import { Spinner } from "@/components/ui/spinner";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -23,14 +25,25 @@ import type { OrderDto } from "@/lib/types";
  */
 const POLL_MS = 4000;
 
-function OrderEntry({ entry, onGone }: { entry: OrderHistoryEntry; onGone: () => void }) {
+function OrderEntry({
+  entry,
+  index,
+  onGone,
+}: {
+  entry: OrderHistoryEntry;
+  index: number;
+  onGone: () => void;
+}) {
   const [data, setData] = useState<OrderDto | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [finished, setFinished] = useState(false);
   const [live, setLive] = useState(false); // SSE frame received
   const [alive, setAlive] = useState(false); // entry confirmed on the server
+  const [pressed, setPressed] = useState(false);
+  const [navigating, setNavigating] = useState(false);
   const finishedRef = useRef(false);
   const liveRef = useRef(false);
+  const router = useRouter();
 
   useEffect(() => {
     finishedRef.current = finished;
@@ -80,8 +93,8 @@ function OrderEntry({ entry, onGone }: { entry: OrderHistoryEntry; onGone: () =>
         if (alive) {
           setData(json.order);
           setError(null);
+          setAlive(true);
           cacheOrderStatus(entry.orderNumber, json.order.status);
-          if (!alive) setAlive(true);
           // status may have become "selesai" between renders
           if (json.order.status === "selesai") setFinished(true);
         }
@@ -139,63 +152,113 @@ function OrderEntry({ entry, onGone }: { entry: OrderHistoryEntry; onGone: () =>
     };
   }, [error, data, entry.id, entry.orderNumber, entry.orderToken, onGone]);
 
+  // ponytail: guard klik ganda — hanya entry valid dengan id yang boleh navigasi.
+  // Order "selesai" tetap bisa dibuka (read-only, SSE-nya memang sudah off),
+  // order aktif akan tersambung real-time lagi di halaman tracking.
+  const openTracking = useCallback(() => {
+    if (!entry.id || navigating) return;
+    setNavigating(true);
+    router.push(`/order/${entry.id}?token=${encodeURIComponent(entry.orderToken)}`);
+  }, [entry.id, entry.orderToken, navigating, router]);
+
+  const interactive = Boolean(entry.id) && !navigating;
+
   return (
-    <li className="rounded-2xl border border-surface-2 bg-surface p-4">
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-sm font-semibold text-ink">{entry.orderNumber}</p>
-        {data ? (
-          <StatusBadge status={data.status} />
-        ) : error ? (
-          <p className="text-xs text-muted">{error}</p>
-        ) : (
-          <Spinner size={14} />
-        )}
-      </div>
-
-      <div className="mt-1 flex flex-wrap items-center justify-between gap-1 text-xs text-muted">
-        <p>
-          {new Date(entry.timestamp).toLocaleString("id-ID", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
-        </p>
-        {data && (
-          <p className="font-medium text-ink">
-            {data.status === "selesai"
-              ? formatRupiah(data.totalPrice)
-              : `${data.items.reduce((sum, it) => sum + it.quantity, 0)} item · ${formatRupiah(data.totalPrice)}`}
-          </p>
-        )}
-      </div>
-
-      {data && data.items.length > 0 && (
-        <ul className="mt-3 space-y-2 border-t border-surface-2 pt-3">
-          {data.items.map((it) => {
-            let specs: string[] = [];
-            try {
-              const raw = JSON.parse(it.customization ?? "");
-              if (Array.isArray(raw)) {
-                specs = raw.map((line) => String(line));
+    <li
+      className={`card-enter group rounded-2xl border bg-surface transition-[transform,box-shadow,background-color,border-color,opacity] duration-200 ease-out ${
+        pressed ? "scale-[0.98] border-primary/30" : ""
+      } ${
+        interactive
+          ? "cursor-pointer border-surface-2 hover:-translate-y-0.5 hover:border-primary/40 hover:bg-surface-2/60 hover:shadow-lg active:bg-surface-2"
+          : "border-surface-2"
+      } ${navigating ? "opacity-60" : ""}`}
+      style={{ "--enter-delay": `${Math.min(index, 8) * 60}ms` } as CSSProperties}
+      role={interactive ? "link" : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      aria-label={interactive ? `Buka pelacakan pesanan ${entry.orderNumber}` : undefined}
+      onClick={interactive ? openTracking : undefined}
+      onKeyDown={
+        interactive
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                openTracking();
               }
-            } catch {
-              // invalid customization -> fall back to default
             }
+          : undefined
+      }
+      onPointerDown={interactive ? () => setPressed(true) : undefined}
+      onPointerUp={interactive ? () => setPressed(false) : undefined}
+      onPointerLeave={interactive ? () => setPressed(false) : undefined}
+      onPointerCancel={interactive ? () => setPressed(false) : undefined}
+    >
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-sm font-semibold text-ink">{entry.orderNumber}</p>
+          <div className="flex items-center gap-1.5">
+            {data ? (
+              <StatusBadge status={data.status} />
+            ) : error ? (
+              <p className="text-xs text-muted">{error}</p>
+            ) : (
+              <Spinner size={14} />
+            )}
+            {interactive && (
+              <ChevronRight
+                aria-hidden="true"
+                className={`h-4 w-4 shrink-0 text-muted transition-transform duration-200 ${
+                  navigating ? "translate-x-0.5 text-primary" : "group-hover:translate-x-0.5"
+                }`}
+              />
+            )}
+          </div>
+        </div>
 
-            return (
-              <li key={it.id} className="flex items-start justify-between gap-2 text-sm">
-                <span className="text-ink">
-                  {it.itemName} <span className="text-muted">×{it.quantity}</span>
-                </span>
-                <span className="text-muted">{specs.length > 0 ? specs.join(" · ") : "Tanpa tambahan"}</span>
-                <span className="font-medium text-ink">{formatRupiah(it.subtotal)}</span>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+        <div className="mt-1 flex flex-wrap items-center justify-between gap-1 text-xs text-muted">
+          <p>
+            {new Date(entry.timestamp).toLocaleString("id-ID", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </p>
+          {data && (
+            <p className="font-medium text-ink">
+              {data.status === "selesai"
+                ? formatRupiah(data.totalPrice)
+                : `${data.items.reduce((sum, it) => sum + it.quantity, 0)} item · ${formatRupiah(data.totalPrice)}`}
+            </p>
+          )}
+        </div>
+
+        {data && data.items.length > 0 && (
+          <ul className="mt-3 space-y-2 border-t border-surface-2 pt-3">
+            {data.items.map((it) => {
+              let specs: string[] = [];
+              try {
+                const raw = JSON.parse(it.customization ?? "");
+                if (Array.isArray(raw)) {
+                  specs = raw.map((line) => String(line));
+                }
+              } catch {
+                // invalid customization -> fall back to default
+              }
+
+              return (
+                <li key={it.id} className="flex items-start justify-between gap-2 text-sm">
+                  <span className="text-ink">
+                    {it.itemName} <span className="text-muted">×{it.quantity}</span>
+                  </span>
+                  <span className="text-muted">{specs.length > 0 ? specs.join(" · ") : "Tanpa tambahan"}</span>
+                  <span className="font-medium text-ink">{formatRupiah(it.subtotal)}</span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
     </li>
   );
 }
@@ -264,8 +327,8 @@ export default function RiwayatPage() {
         </div>
       ) : (
         <ul className="mt-4 space-y-3">
-          {entries.map((entry) => (
-            <OrderEntry key={entry.orderNumber} entry={entry} onGone={handleGone} />
+          {entries.map((entry, index) => (
+            <OrderEntry key={entry.orderNumber} entry={entry} index={index} onGone={handleGone} />
           ))}
         </ul>
       )}
