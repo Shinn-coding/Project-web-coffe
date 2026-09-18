@@ -11,3 +11,4 @@ public/uploads/
 DESIGN.md
 prisma/dev.db.backup
 tsconfig.tsbuildinfo
+.neon

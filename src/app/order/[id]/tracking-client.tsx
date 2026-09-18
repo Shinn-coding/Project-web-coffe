@@ -167,7 +167,9 @@ export default function TrackingClient({
         <h2 className="text-sm font-semibold text-on-surface mb-2">Status</h2>
         <ol className="flex flex-col gap-0">
           {STATUS_ORDER.map((step, i) => {
-            const doneStep = i < currentStep;
+            // Status "selesai" menempati step terakhir (currentStep), bukan step sebelumnya —
+            // ikut tandai done agar step terakhir menampilkan checkmark hijau, bukan icon jam.
+            const doneStep = i < currentStep || (i === currentStep && order.status === "selesai");
             const current = i === currentStep;
             return (
               <li key={step} className="relative flex gap-3 pb-4 last:pb-0">
