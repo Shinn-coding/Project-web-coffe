@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { CheckCircle2, Check, Clock, Wifi, WifiOff } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { formatRupiah, STATUS_ORDER, STATUS_LABEL, type StatusKey } from "@/lib/format";
+import { formatRupiah, STATUS_ORDER, STATUS_LABEL, isFinalOrderStatus, type StatusKey } from "@/lib/format";
 import { useOrderStatusStream } from "@/lib/use-order-status-stream";
 import type { OrderDto } from "@/lib/types";
 
@@ -30,7 +30,7 @@ export default function TrackingClient({
   const [error, setError] = React.useState<string | null>(null);
   const [live, setLive] = React.useState(false);
   const [down, setDown] = React.useState(false);
-  const [done, setDone] = React.useState(initialOrder?.status === "selesai");
+  const [done, setDone] = React.useState(isFinalOrderStatus(initialOrder?.status ?? ""));
 
   // ponytail: track which steps JUST got checked by a real-time update so the
   // checkmark can replay its pop animation — without this, React reuses the
@@ -64,7 +64,7 @@ export default function TrackingClient({
         if (alive) {
           setOrder(json.order);
           setError(null);
-          if (json.order.status === "selesai") setDone(true);
+          if (isFinalOrderStatus(json.order.status)) setDone(true);
         }
       } catch {
         if (alive) setError("Tidak dapat memuat status. Periksa di kasir.");
@@ -78,7 +78,8 @@ export default function TrackingClient({
     };
   }, [orderId, token, done, live]);
 
-  // Real-time status push — token-gated SSE, auto-closes on "selesai".
+  // Real-time status push — token-gated SSE + 25s safety poll, auto-stops on a
+  // final status (selesai/dibatalkan).
   useOrderStatusStream({
     orderId,
     orderToken: token || undefined,
@@ -86,7 +87,7 @@ export default function TrackingClient({
     onEvent: React.useCallback((status: string) => {
       setError(null);
       setOrder((prev) => (prev ? { ...prev, status: status as OrderDto["status"] } : prev));
-      if (status === "selesai") setDone(true);
+      if (isFinalOrderStatus(status)) setDone(true);
     }, []),
     onLive: React.useCallback(() => {
       setLive(true);

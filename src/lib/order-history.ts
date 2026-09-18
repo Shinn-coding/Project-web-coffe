@@ -1,3 +1,5 @@
+import { isFinalOrderStatus } from "@/lib/format";
+
 const STORAGE_KEY = "orderHistory";
 const STATUS_KEY = "orderHistoryStatus";
 const MAX_ENTRIES = 20;
@@ -83,7 +85,7 @@ export function pruneFinishedEntries(now: number = Date.now()): string[] {
   const cache = readStatuses();
   const doneAt: Record<string, number> = {};
   for (const [orderNumber, s] of Object.entries(cache)) {
-    if (s?.status === "selesai" && typeof s.fetchedAt === "number") {
+    if (s && isFinalOrderStatus(s.status) && typeof s.fetchedAt === "number") {
       doneAt[orderNumber] = s.fetchedAt;
     }
   }

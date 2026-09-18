@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import {
-  addOrderClientWithHeartbeat,
-  removeOrderClient,
-  getLastOrderState,
-  HEARTBEAT_MS,
-} from "@/lib/order-stream";
+import { addOrderClientWithHeartbeat, removeOrderClient } from "@/lib/order-stream";
+import { isFinalOrderStatus } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -17,14 +13,17 @@ export const dynamic = "force-dynamic";
  * stream is opened, so a customer only ever receives frames for their own
  * order — never a global broadcast.
  *
- * Resource-friendly: the server closes the stream as soon as the order
- * reaches "selesai" (status can't change again), so no connection idles on a
- * finished order. Clients also auto-close on the same event.
+ * Resource-friendly: the stream closes as soon as the order reaches a final
+ * status (selesai/dibatalkan — nothing can change), so no connection idles on
+ * a finished order. Final-status orders are refused outright with 410, and
+ * clients also auto-close on the same frame.
  *
- * Anti-delay: an immediate `ping` is sent on connect (echoing the last known
- * status — instant catch-up for reconnections) and every HEARTBEAT_MS the
- * broadcaster sweeps all streams, so intermediaries can't silently buffer the
- * channel and clients can detect a dead socket within ~2 beats.
+ * Anti-delay on serverless: an immediate `ping` (with the latest DB status)
+ * is sent on connect — instant catch-up for reconnections — and the shared
+ * heartbeat sweep re-reads every subscribed order from the DB every
+ * HEARTBEAT_MS, so a status change that happened on another lambda instance
+ * (Vercel) still reaches every subscriber within one beat. Clients keep an
+ * independent REST safety poll on top of all this.
  */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -39,6 +38,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 
   // Token gate BEFORE opening the stream — same contract as the REST endpoint.
+  // The status read here is also the freshest possible connect-time snapshot.
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     select: { orderToken: true, status: true, orderNumber: true },
@@ -47,8 +47,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ success: false, error: "Pesanan tidak ditemukan" }, { status: 404 });
   }
 
-  // Already finished → nothing can change; do not open a connection at all.
-  if (order.status === "selesai") {
+  // Already final → nothing can change; do not open a connection at all.
+  if (isFinalOrderStatus(order.status)) {
     return NextResponse.json({ success: false, error: "Pesanan sudah selesai" }, { status: 410 });
   }
 
@@ -63,30 +63,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       controller.enqueue(encoder.encode("retry: 3000\n\n"));
       // Immediate first frame: flushes any intermediary buffer and gives the
       // client an instant catch-up ping with the latest known status.
-      const state = getLastOrderState(token);
       controller.enqueue(
         encoder.encode(
-          `event: ping\ndata: ${JSON.stringify(state ?? { id: orderId, orderNumber: order.orderNumber, status: order.status })}\n\n`,
+          `event: ping\ndata: ${JSON.stringify({ id: orderId, orderNumber: order.orderNumber, status: order.status })}\n\n`,
         ),
       );
-      // Belt-and-suspenders per-stream keepalive (the broadcaster also sweeps).
-      // Sweeping through the broadcaster already handles this; the timer here
-      // only guards against that timer being lost across dev HMR reloads.
-      const beat = setInterval(() => {
-        try {
-          const s = getLastOrderState(token);
-          controller.enqueue(
-            encoder.encode(
-              `event: ping\ndata: ${JSON.stringify(s ?? { id: orderId, orderNumber: order.orderNumber, status: order.status })}\n\n`,
-            ),
-          );
-        } catch {
-          clearInterval(beat);
-          if (controllerRef) removeOrderClient(token, controllerRef);
-        }
-      }, HEARTBEAT_MS);
-      // Don't hold the process open for a stream nobody listens to anymore.
-      if (typeof beat === "object" && "unref" in beat) (beat as unknown as { unref: () => void }).unref();
+      // No per-stream timer here: the broadcaster's DB-backed sweep delivers
+      // keepalives AND cross-instance status updates every HEARTBEAT_MS.
     },
     cancel() {
       if (controllerRef) removeOrderClient(token, controllerRef);

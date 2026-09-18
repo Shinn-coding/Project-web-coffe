@@ -1,26 +1,37 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { isFinalOrderStatus } from "@/lib/format";
 
-/** Server pings every HEARTBEAT_MS; two missed beats ⇒ treat the stream as dead. */
+/**
+ * Server pings every HEARTBEAT_MS (10s); two missed beats ⇒ treat the stream
+ * as dead. Tuned above STALE_MS/2 so a healthy stream never trips the
+ * watchdog, while a silently-buffered/dozed socket is recycled in ~24s.
+ */
 const STALE_MS = 24_000;
-/** While the stream is down/dead, poll REST at this cadence (near-real-time). */
-const FALLBACK_POLL_MS = 4_000;
+/**
+ * Safety-net poll cadence (the "jaring pengaman" from the serverless hybrid
+ * design): runs CONCURRENTLY with SSE — not only when the stream is down —
+ * so a connection that dies silently without tripping EventSource.onerror or
+ * the stale watchdog still converges within ~25s instead of hanging forever.
+ */
+const SAFETY_POLL_MS = 25_000;
+/** Reconnect backoff schedule for the SSE stream (ms), capped at 30s. */
+const BACKOFF_MS = [3_000, 6_000, 12_000, 24_000, 30_000] as const;
 
 /**
  * Customer-side SSE hook for ONE order (privacy: the stream is token-gated
  * server-side, so it only ever carries this order's status frames).
  *
- * Low-latency + battery-frugal:
- * - The server closes the stream right after the `selesai` frame (status can
- *   never change again) and refuses new streams for finished orders (410).
- * - The hook closes its EventSource as soon as it sees `selesai` and will not
- *   reconnect afterwards — no idle connection burning battery on a done order.
- * - The server pings every 10s; if NO frame (status or ping) arrives within
- *   STALE_MS the connection is considered dead and is recycled — this catches
- *   silently-buffered/dozed sockets that leave EventSource "OPEN" forever.
- * - REST polling only runs while the stream is down/dead, at FALLBACK_POLL_MS
- *   (not a fixed slow loop), so worst-case staleness stays a few seconds.
+ * Hybrid robustness for serverless deploys (Vercel):
+ * - SSE stays the primary transport: instant push when it works.
+ * - EventSource errors + a heartbeat watchdog recycle dead streams and
+ *   reconnect with a simple backoff: 3s → 6s → 12s → 24s → 30s (capped).
+ * - A slow safety poll (SAFETY_POLL_MS) runs whenever the stream is down AND
+ *   whenever it looks live — worst-case staleness is bounded at ~25s even if
+ *   SSE dies without being detected at all.
+ * - Everything (stream + poll + backoff timer) stops the moment the order
+ *   reaches a FINAL status (selesai/dibatalkan) — no idle work on done orders.
  * - On tab-visible after backgrounding, one instant REST sync closes any gap
  *   the OS doze introduced.
  *
@@ -37,7 +48,6 @@ export function useOrderStatusStream({
   onEvent,
   onLive,
   onDown,
-  pollMs = FALLBACK_POLL_MS,
 }: {
   orderId: number | string | undefined;
   orderToken: string | undefined;
@@ -47,7 +57,6 @@ export function useOrderStatusStream({
   onLive?: () => void;
   /** Fired ONLY on the live→down transition (zombie socket, error, doze). */
   onDown?: () => void;
-  pollMs?: number;
 }) {
   const onEventRef = useRef(onEvent);
   const onLiveRef = useRef(onLive);
@@ -64,10 +73,11 @@ export function useOrderStatusStream({
   useEffect(() => {
     if (!enabled || !orderId || !orderToken) return;
     let disposed = false;
-    let finished = false; // order reached "selesai" — stop everything
+    let finished = false; // order reached a FINAL status — stop everything
     let es: EventSource | null = null;
     let pollTimer: ReturnType<typeof setInterval> | null = null;
     let staleTimer: ReturnType<typeof setTimeout> | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
     let verifyInFlight = false;
     let down = false; // stream currently considered dead (live→down bracket)
 
@@ -83,11 +93,19 @@ export function useOrderStatusStream({
       onLiveRef.current?.();
     };
 
-    const closeStream = () => {
+    const clearTimers = () => {
       if (staleTimer) {
         clearTimeout(staleTimer);
         staleTimer = null;
       }
+      if (retryTimer) {
+        clearTimeout(retryTimer);
+        retryTimer = null;
+      }
+    };
+
+    const closeStream = () => {
+      clearTimers();
       es?.close();
       es = null;
     };
@@ -105,7 +123,7 @@ export function useOrderStatusStream({
       stopPolling();
     };
 
-    // One REST check: applies latest status; returns true when finished.
+    // One REST check: applies latest status; returns true when final.
     const verifyOnce = async (): Promise<boolean> => {
       if (verifyInFlight) return finished;
       verifyInFlight = true;
@@ -116,7 +134,7 @@ export function useOrderStatusStream({
         const status = json?.order?.status as string | undefined;
         if (status) {
           onEventRef.current?.(status);
-          if (status === "selesai") {
+          if (isFinalOrderStatus(status)) {
             stopAll();
             return true;
           }
@@ -131,8 +149,10 @@ export function useOrderStatusStream({
 
     const startPolling = () => {
       if (pollTimer || finished || disposed) return;
-      pollTimer = setInterval(() => void verifyOnce(), pollMs);
+      pollTimer = setInterval(() => void verifyOnce(), SAFETY_POLL_MS);
     };
+
+    let attempt = 0; // failed reconnect attempts (drives the backoff)
 
     // Two missed heartbeats ⇒ the socket is a zombie (open but silent).
     // markDown() fires up front so the UI hint appears while the zombie socket
@@ -142,30 +162,48 @@ export function useOrderStatusStream({
       staleTimer = setTimeout(() => {
         if (finished || disposed || !es) return;
         markDown();
-        // recycle the dead stream — onerror fires, fallback poll takes over
+        // recycle the dead stream — reconnect via backoff, safety poll takes over
         closeStream();
+        scheduleReconnect();
       }, STALE_MS);
+    };
+
+    const scheduleReconnect = () => {
+      if (finished || disposed) return;
+      markDown();
+      startPolling();
+      const delay = BACKOFF_MS[Math.min(attempt, BACKOFF_MS.length - 1)];
+      attempt += 1;
+      if (retryTimer) clearTimeout(retryTimer);
+      retryTimer = setTimeout(() => {
+        retryTimer = null;
+        if (!finished && !disposed) connect();
+        else stopPolling();
+      }, delay);
     };
 
     const connect = () => {
       if (finished || disposed) return;
-      // Only treat this attempt as "down" if we HAD a live stream before —
-      // the brief initial connect window should not alarm the customer.
-      if (es !== null) markDown();
       es = new EventSource(`/api/orders/${orderId}/stream?token=${encodeURIComponent(orderToken)}`);
 
       const onFrame = () => {
-        // any frame (ping or real) proves the transport is alive
+        attempt = 0; // a live frame resets the backoff ladder
         armStaleTimer();
-        stopPolling();
         markLive();
+        // Safety poll keeps running even while live (see SAFETY_POLL_MS).
       };
 
       es.addEventListener("ping", (e) => {
         onFrame();
         try {
           const data = JSON.parse((e as MessageEvent).data) as { status?: string };
-          if (data.status && data.status !== "selesai") onEventRef.current?.(data.status);
+          // Ping carries a real status only when non-final; the DB-backed
+          // heartbeat on the server would otherwise re-announce "selesai"
+          // frames the client has already acted on.
+          if (data.status && !isFinalOrderStatus(data.status)) onEventRef.current?.(data.status);
+          // Final status on a ping means the order finished between frames —
+          // converge and stop (also stops the safety poll).
+          if (data.status && isFinalOrderStatus(data.status)) void verifyOnce();
         } catch {
           // malformed ping — liveness already handled
         }
@@ -176,7 +214,7 @@ export function useOrderStatusStream({
         try {
           const data = JSON.parse((e as MessageEvent).data) as { status: string };
           onEventRef.current?.(data.status);
-          if (data.status === "selesai") stopAll(); // final — server closes too
+          if (isFinalOrderStatus(data.status)) stopAll(); // final — server closes too
         } catch {
           // malformed frame — ignore, next beat will recover
         }
@@ -185,14 +223,9 @@ export function useOrderStatusStream({
       es.onerror = () => {
         closeStream();
         if (finished || disposed) return;
-        // Stream down (reconnect backoff, doze, network switch) → fast REST
-        // poll keeps status fresh until the stream is back.
-        markDown();
-        startPolling();
-        setTimeout(() => {
-          if (!finished && !disposed) connect();
-          else stopPolling();
-        }, 2_000);
+        // Stream down (reconnect backoff, doze, network switch) — the safety
+        // poll keeps status fresh and the backoff ladder retries SSE.
+        scheduleReconnect();
       };
 
       armStaleTimer();
@@ -201,6 +234,10 @@ export function useOrderStatusStream({
     connect();
     // initial sync in case the order changed/finished while this hook was idle
     void verifyOnce();
+
+    // Safety poll runs from the start — SSE and poll are CONCURRENT by design
+    // (jaring pengaman), so a silently-dead stream never blocks convergence.
+    startPolling();
 
     // Instant catch-up when the tab becomes visible again (phone doze gap).
     const onVisible = () => {
@@ -213,5 +250,5 @@ export function useOrderStatusStream({
       stopAll();
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [enabled, orderId, orderToken, pollMs]);
+  }, [enabled, orderId, orderToken]);
 }

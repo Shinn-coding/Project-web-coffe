@@ -8,6 +8,7 @@ import { ChevronRight } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { formatRupiah } from "@/lib/format";
+import { isFinalOrderStatus } from "@/lib/format";
 import {
   getOrderHistory,
   removeOrderFromHistory,
@@ -56,7 +57,7 @@ function OrderEntry({
     (status: string) => {
       setData((prev) => (prev ? { ...prev, status: status as OrderDto["status"] } : prev));
       cacheOrderStatus(entry.orderNumber, status);
-      if (status === "selesai") setFinished(true);
+      if (isFinalOrderStatus(status)) setFinished(true);
     },
     [entry.orderNumber],
   );
@@ -95,8 +96,8 @@ function OrderEntry({
           setError(null);
           setAlive(true);
           cacheOrderStatus(entry.orderNumber, json.order.status);
-          // status may have become "selesai" between renders
-          if (json.order.status === "selesai") setFinished(true);
+          // status may have become final (selesai/dibatalkan) between renders
+          if (isFinalOrderStatus(json.order.status)) setFinished(true);
         }
       } catch (err) {
         // ponytail: log the real cause — a bare generic message hid the 404s before

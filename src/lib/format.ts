@@ -23,6 +23,16 @@ export const STATUS_COLOR: Record<StatusKey, string> = {
 };
 
 /**
+ * Statuses after which nothing can change anymore — SSE streams and the
+ * fallback poll both stop on these (no idle connection/poll on a done order).
+ * "dibatalkan" is included defensively; the shop flow currently ends only at
+ * "selesai".
+ */
+export function isFinalOrderStatus(status: string): boolean {
+  return status === "selesai" || status === "dibatalkan";
+}
+
+/**
  * Local "YYYY-MM-DD" for a Date — matches how orderDate is written by the API
  * (server-local date, NOT UTC, so day boundaries follow the coffee shop clock).
  */
