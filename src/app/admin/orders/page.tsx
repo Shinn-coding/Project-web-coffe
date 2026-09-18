@@ -2,11 +2,12 @@
 
 import * as React from "react";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { ArrowRight, BellRing, CalendarDays } from "lucide-react";
+import { ArrowRight, BellRing, CalendarDays, ChefHat, ReceiptText } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useToasts, ToastHost } from "@/components/ui/toast";
 import { formatRupiah, localDateKey, orderDateLabel, nextStatus, STATUS_LABEL, type StatusKey } from "@/lib/format";
+import { ReceiptTicketModal } from "@/components/receipt";
 import type { OrderDto } from "@/lib/types";
 
 /**
@@ -30,10 +31,14 @@ function OrderCard({
   o,
   advancing,
   onAdvance,
+  onKitchenTicket,
+  onCustomerReceipt,
 }: {
   o: OrderDto;
   advancing: boolean;
   onAdvance: (o: OrderDto) => void;
+  onKitchenTicket: (o: OrderDto) => void;
+  onCustomerReceipt: (o: OrderDto) => void;
 }) {
   const next = nextStatus(o.status);
   return (
@@ -67,18 +72,34 @@ function OrderCard({
           );
         })}
       </ul>
-      {next && (
+      <div className="flex flex-wrap items-center gap-2 self-start">
+        {next && (
+          <button
+            type="button"
+            onClick={() => onAdvance(o)}
+            disabled={advancing}
+            className="inline-flex items-center justify-center gap-1.5 rounded-full bg-primary px-4 py-2.5 text-sm font-medium text-primary-fg hover:bg-primary-hover disabled:opacity-50 transition-colors cursor-pointer"
+          >
+            {advancing && <Spinner size={14} />}
+            Lanjutkan ke {STATUS_LABEL[next as StatusKey]}
+            <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          </button>
+        )}
         <button
           type="button"
-          onClick={() => onAdvance(o)}
-          disabled={advancing}
-          className="inline-flex items-center justify-center gap-1.5 rounded-full bg-primary px-4 py-2.5 text-sm font-medium text-primary-fg hover:bg-primary-hover disabled:opacity-50 transition-colors cursor-pointer self-start"
+          onClick={() => onKitchenTicket(o)}
+          className="inline-flex items-center justify-center gap-1.5 rounded-full border border-border bg-bg px-4 py-2.5 text-sm font-medium text-ink hover:bg-surface-2 transition-colors cursor-pointer"
         >
-          {advancing && <Spinner size={14} />}
-          Lanjutkan ke {STATUS_LABEL[next as StatusKey]}
-          <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          <ChefHat className="h-4 w-4" aria-hidden="true" /> Struk Dapur
         </button>
-      )}
+        <button
+          type="button"
+          onClick={() => onCustomerReceipt(o)}
+          className="inline-flex items-center justify-center gap-1.5 rounded-full border border-border bg-bg px-4 py-2.5 text-sm font-medium text-ink hover:bg-surface-2 transition-colors cursor-pointer"
+        >
+          <ReceiptText className="h-4 w-4" aria-hidden="true" /> Struk Customer
+        </button>
+      </div>
     </li>
   );
 }
@@ -91,6 +112,8 @@ export default function AdminOrdersPage() {
   const knownIds = useRef<Set<number>>(new Set());
   const firstLoad = useRef(true);
   const pushToast = useToasts((s) => s.push);
+  // Modal pratinjau struk: "kitchen" (tanpa harga, buat dapur) atau "customer" (dengan harga, buat kasir kasihkan)
+  const [ticket, setTicket] = useState<{ o: OrderDto; kind: "kitchen" | "customer" } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -200,7 +223,7 @@ export default function AdminOrdersPage() {
 
       {active.length === 0 && done.length === 0 ? (
         <p className="rounded-[var(--radius-md)] border border-dashed border-border px-4 py-10 text-center text-sm text-muted">
-          Belum ada pesanan.
+          Belum ada pesanan hari ini.
         </p>
       ) : (
         <>
@@ -224,7 +247,14 @@ export default function AdminOrdersPage() {
                 </div>
                 <ul className="flex flex-col gap-3">
                   {dayActive.map((o) => (
-                    <OrderCard key={o.id} o={o} advancing={advancing === o.id} onAdvance={advance} />
+                    <OrderCard
+                      key={o.id}
+                      o={o}
+                      advancing={advancing === o.id}
+                      onAdvance={advance}
+                      onKitchenTicket={(o) => setTicket({ o, kind: "kitchen" })}
+                      onCustomerReceipt={(o) => setTicket({ o, kind: "customer" })}
+                    />
                   ))}
                 </ul>
               </section>
@@ -259,6 +289,11 @@ export default function AdminOrdersPage() {
             </section>
           ))}
         </>
+      )}
+
+      {/* Modal pratinjau + print struk (dapur/customer) — salinan kertas via portal */}
+      {ticket && (
+        <ReceiptTicketModal order={ticket.o} kind={ticket.kind} onClose={() => setTicket(null)} />
       )}
 
       <ToastHost />

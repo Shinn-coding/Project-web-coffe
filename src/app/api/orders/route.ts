@@ -3,13 +3,34 @@ import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { normalizeOptions, sanitizeSelection, selectionDelta, specLine } from "@/lib/customization";
 import { emitNewOrder } from "@/lib/order-stream";
+import { isOpenAt } from "@/lib/hours";
 
 export const dynamic = "force-dynamic";
 
 const MAX_QTY = 9;
 
+// S2-style order rate limit: 10 orders / minute per client IP.
+// ponytail: in-memory per-instance, pindah ke Redis/DB bila multi-instance nanti.
+const MAX_REQ = 10;
+const WINDOW_MS = 60_000;
+const orderLimits = new Map<string, number[]>();
+
 /** POST /api/orders — guest checkout, no auth. Computes total server-side. */
 export async function POST(req: NextRequest) {
+  // Rate limit — checked before any validation or DB work
+  const forwarded = req.headers.get("x-forwarded-for");
+  const clientKey = forwarded?.split(",")[0].trim() || req.headers.get("x-real-ip") || "unknown";
+  const now = Date.now();
+  const timestamps = (orderLimits.get(clientKey) ?? []).filter((t) => now - t < WINDOW_MS);
+  if (timestamps.length >= MAX_REQ) {
+    return NextResponse.json(
+      { success: false, error: "Terlalu banyak pesanan, tunggu sebentar" },
+      { status: 429 }
+    );
+  }
+  timestamps.push(now);
+  orderLimits.set(clientKey, timestamps);
+
   let body: { customerName?: string; tableNumber?: string; items?: { menuItemId: number; quantity: number; selection?: unknown }[] };
   try {
     body = await req.json();
@@ -19,6 +40,22 @@ export async function POST(req: NextRequest) {
 
   const name = (body.customerName ?? "").trim();
   if (!name) return NextResponse.json({ success: false, error: "Nama wajib diisi" }, { status: 400 });
+
+  // Guard jam buka di server juga — jangan percaya client clock
+  try {
+    const row = await prisma.shopSetting.findUnique({ where: { id: 1 } });
+    if (row?.openHour && row?.closeHour) {
+      const hours = { openHour: row.openHour, closeHour: row.closeHour };
+      if (isOpenAt(hours, new Date()) === false) {
+        return NextResponse.json(
+          { success: false, error: "Warung sedang tutup — pesanan dibuka pukul " + row.openHour.replace(":", ".") },
+          { status: 403 }
+        );
+      }
+    }
+  } catch (err) {
+    console.error("[orders POST] hours guard", err); // gagal baca settings → jangan blokir order
+  }
 
   const lines = (body.items ?? []).filter((i) => i && typeof i.menuItemId === "number" && i.quantity > 0);
   if (lines.length === 0) {

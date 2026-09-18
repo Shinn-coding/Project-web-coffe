@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, Pencil, Trash2, ImageOff } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { Plus, Pencil, Trash2, ImageOff, Upload } from "lucide-react";
 import { OptionGroupBuilder, validateGroups, groupsToOptions, optionsToGroups } from "@/components/admin/option-group-builder";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -200,6 +200,47 @@ function MenuForm({
   const [saving, setSaving] = useState(false);
   const [errMsg, setErrMsg] = useState<string | null>(null);
 
+  // Image upload — file goes to /api/admin/upload, result URL lands in `imageUrl`
+  const [uploading, setUploading] = useState(false);
+  const [uploadNote, setUploadNote] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleUploadFile(file: File) {
+    setUploadError(null);
+    setUploadNote(null);
+    // Client-side pre-check (server re-validates via magic bytes anyway)
+    const isPreferred = file.type === "image/jpeg" || file.type === "image/png";
+    const isAllowed = isPreferred || /^(image\/(webp|gif|avif))$/.test(file.type);
+    if (!isAllowed) {
+      setUploadError("Format tidak didukung. Utamakan JPG, PNG, atau JPEG.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError("Ukuran file maksimal 5 MB");
+      return;
+    }
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Gagal mengunggah gambar");
+      setImageUrl(json.url);
+      setUploadNote(
+        json.preferred
+          ? "Gambar diunggah."
+          : "Gambar diunggah — pertimbangkan JPG/PNG agar kualitas tampilan terjaga."
+      );
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Gagal mengunggah gambar");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErrMsg(null);
@@ -288,8 +329,68 @@ function MenuForm({
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="m-img" className="text-sm font-medium text-on-surface">Gambar URL (opsional)</label>
-          <Input id="m-img" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://…" />
+          <span className="text-sm font-medium text-on-surface">Gambar (opsional)</span>
+          <p className="text-xs text-muted">
+            Unggah file dari perangkat — utamakan JPG, PNG, JPEG — atau tempel URL gambar.
+          </p>
+
+          {/* Live preview */}
+          <div className="relative h-36 w-full overflow-hidden rounded-[var(--radius-sm)] border border-border bg-surface-2">
+            <MenuItemImage src={imageUrl || null} alt="Pratinjau gambar menu" />
+          </div>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void handleUploadFile(f);
+            }}
+          />
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+            >
+              {uploading ? <Spinner size={16} /> : <Upload className="h-4 w-4" aria-hidden="true" />}
+              {uploading ? "Mengunggah…" : "Unggah Gambar"}
+            </Button>
+            {imageUrl && (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setImageUrl("");
+                  setUploadNote(null);
+                  setUploadError(null);
+                }}
+              >
+                Hapus gambar
+              </Button>
+            )}
+          </div>
+
+          <Input
+            id="m-img"
+            value={imageUrl}
+            onChange={(e) => {
+              setImageUrl(e.target.value);
+              setUploadNote(null);
+            }}
+            placeholder="https://… atau /uploads/menu/xxx.jpg"
+          />
+
+          {uploadNote && <p className="text-xs text-emerald-700">{uploadNote}</p>}
+          {uploadError && (
+            <p className="text-xs text-status-error" role="alert">
+              {uploadError}
+            </p>
+          )}
         </div>
 
         <div className="flex flex-col gap-1.5">

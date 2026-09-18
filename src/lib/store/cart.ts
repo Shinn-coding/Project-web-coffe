@@ -19,6 +19,7 @@ export interface CartItem {
 
 interface CartState {
   items: CartItem[];
+  tableNumber: string | null; // prefilled from table QR (?meja=N), editable at checkout
   addItem: (opts: {
     menuItemId: number;
     name: string;
@@ -29,6 +30,7 @@ interface CartState {
   }) => void;
   setQuantity: (key: string, quantity: number) => void;
   removeItem: (key: string) => void;
+  setTableNumber: (n: string | null) => void;
   clear: () => void;
 }
 
@@ -46,6 +48,7 @@ export const useCart = create<CartState>()(
   persist(
     (set) => ({
       items: [],
+      tableNumber: null,
       addItem: ({ menuItemId, name, imageUrl, basePrice, selection, itemOptions }) =>
         set((state) => {
           const key = makeKey(menuItemId, selection);
@@ -74,6 +77,9 @@ export const useCart = create<CartState>()(
               : state.items.map((i) => (i.key === key ? { ...i, quantity } : i)),
         })),
       removeItem: (key) => set((state) => ({ items: state.items.filter((i) => i.key !== key) })),
+      setTableNumber: (n) => set({ tableNumber: n }),
+      // ponytail: keep tableNumber on clear — customer stays at the same table for
+      // repeat orders; it only changes when they scan another table's QR.
       clear: () => set({ items: [] }),
     }),
     { name: "coffee-cart" }

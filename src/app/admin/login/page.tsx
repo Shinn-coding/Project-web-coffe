@@ -3,13 +3,17 @@
 import * as React from "react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Coffee } from "lucide-react";
+import { Coffee, Moon } from "lucide-react";
+import { ADMIN_IDLE_MINUTES } from "@/lib/idle-timeout";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 
 export default function AdminLoginPage() {
   const router = useRouter();
+  const [idleReason] = useState(
+    () => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("reason") === "idle"
+  );
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -71,6 +75,16 @@ export default function AdminLoginPage() {
             autoComplete="current-password"
           />
         </div>
+
+        {idleReason && (
+          <p
+            className="inline-flex items-center gap-2 rounded-[var(--radius-sm)] border border-border bg-surface-2 px-3 py-2 text-sm text-muted"
+            role="status"
+          >
+            <Moon className="h-4 w-4 shrink-0" aria-hidden="true" />
+            Sesi berakhir setelah {ADMIN_IDLE_MINUTES} menit tanpa aktivitas & tanpa pesanan masuk — silakan masuk lagi.
+          </p>
+        )}
 
         {error && (
           <p className="rounded-[var(--radius-sm)] bg-status-error/10 border border-status-error/30 px-3 py-2 text-sm text-status-error" role="alert">

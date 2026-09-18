@@ -10,6 +10,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { formatRupiah } from "@/lib/format";
 import { useCart, cartCount, cartSubtotal } from "@/lib/store/cart";
 import { addOrderToHistory } from "@/lib/order-history";
+import { isOpenAt } from "@/lib/hours";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -17,13 +18,44 @@ export default function CheckoutPage() {
   const clear = useCart((s) => s.clear);
 
   const [name, setName] = useState("");
-  const [table, setTable] = useState("");
+  // One-way sync from the cart store: QR ?meja=N prefill lands here as the
+  // initial value; the customer can still edit freely before submitting.
+  const [table, setTable] = useState<string>(useCart.getState().tableNumber ?? "");
   const [nameError, setNameError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const count = cartCount(items);
   const subtotal = cartSubtotal(items);
+
+  // Guard jam buka di client: warung tutup → blokir submit & arahkan balik ke menu
+  // (server tetap menolak dengan 403 — ini hanya UX)
+  const [closedHours, setClosedHours] = useState<{ openHour: string; closeHour: string } | null>(null);
+  const [hoursLoading, setHoursLoading] = useState(true);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/settings");
+        const json = await res.json();
+        if (alive && json.data) setClosedHours(json.data);
+      } catch {
+        // gagal fetch → biarkan server yang jadi gatekeeper saat submit
+      } finally {
+        if (alive) setHoursLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const isOpenNow = closedHours ? isOpenAt(closedHours, new Date()) : null;
+  const closed = isOpenNow === false;
+
+  // Tutup → kembali ke menu (di sana ada overlay interaktif)
+  useEffect(() => {
+    if (!hoursLoading && closed) router.replace("/");
+  }, [hoursLoading, closed, router]);
 
   // Empty cart → back to menu
   useEffect(() => {
@@ -35,6 +67,10 @@ export default function CheckoutPage() {
     e.preventDefault();
     if (!name.trim()) {
       setNameError("Nama wajib diisi");
+      return;
+    }
+    if (closed) {
+      setSubmitError("Warung sedang tutup — pesanan dibuka pukul " + (closedHours?.openHour ?? "").replace(":", "."));
       return;
     }
     setSubmitting(true);

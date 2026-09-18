@@ -6,6 +6,7 @@ node_modules/
 opencode.json
 opencode.example.json
 data/
+public/uploads/
 .env*
 DESIGN.md
 prisma/dev.db.backup

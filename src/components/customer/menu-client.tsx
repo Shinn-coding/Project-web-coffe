@@ -14,6 +14,8 @@ import { Button } from "@/components/ui/button";
 import { useCart, cartCount } from "@/lib/store/cart";
 import { hasRequiredOptions } from "@/components/customer/item-options";
 import { useToasts, ToastHost } from "@/components/ui/toast";
+import { isOpenAt } from "@/lib/hours";
+import { ClosedOverlay, ClosedBrowseBar } from "@/components/customer/closed-overlay";
 import type { CategoryDto, MenuItemDto } from "@/lib/types";
 
 // ponytail: guarded parse so malformed customizationOptions never crash the add flow
@@ -25,21 +27,120 @@ function parseOptions(raw: string | undefined | null): Record<string, unknown> {
   }
 }
 
+/** "08:00" → "08.00" for display */
+function fmt(hhmm: string): string {
+  return hhmm.replace(":", ".");
+}
+
 export function MenuClient({
   initialItems,
   categories,
+  tableNumber,
+  initialHours,
+  serverOpen,
 }: {
   initialItems: MenuItemDto[];
   categories: CategoryDto[];
+  tableNumber?: string | null;
+  /** Jam buka dari server (SSR) — overlay bisa tampil di render pertama */
+  initialHours: { openHour: string; closeHour: string } | null;
+  /** Status buka/tutup dihitung server (jam WIB) saat halaman dimuat */
+  serverOpen: boolean | null;
 }) {
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
   const [category, setCategory] = useState<number | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
   const [customizing, setCustomizing] = useState<MenuItemDto | null>(null);
+  // Status tutup: SSR langsung set "overlay" kalau server bilang tutup —
+  // overlay ikut ter-render di HTML pertama, nol delay.
+  const [closedView, setClosedView] = useState<null | "overlay" | "browse">(
+    serverOpen === false ? "overlay" : null
+  );
   const cartItems = useCart((s) => s.items);
   const count = cartCount(cartItems);
   const pushToast = useToasts((s) => s.push);
+
+  const [hours, setHours] = useState(initialHours);
+  // null = pakai status server (belum ada info client yang lebih baru)
+  const [clientOpen, setClientOpen] = useState<boolean | null>(null);
+
+  // QR ?meja=N → selalu adopt nomor meja dari scan: pelanggan fisik di meja itu,
+  // jadi scan meja lain (pindah meja) harus mengganti nilai lama. Tanpa param → tidak diubah.
+  useEffect(() => {
+    if (tableNumber && useCart.getState().tableNumber !== tableNumber) {
+      useCart.getState().setTableNumber(tableNumber);
+    }
+  }, [tableNumber]);
+
+  // Sinkronisasi ringan: cek ulang settings sekali setelah mount (tanpa memblokir
+  // status awal — yang dari server sudah tampil). Hanya update kalau berubah.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/settings");
+        const json = await res.json();
+        if (!res.ok || !alive) return;
+        const next = json.data as { openHour: string; closeHour: string } | null;
+        if (!next) {
+          if (initialHours) {
+            setHours(null);
+            setClientOpen(null);
+          }
+          return;
+        }
+        setHours((prev) => {
+          const same = prev && prev.openHour === next.openHour && prev.closeHour === next.closeHour;
+          return same ? prev : next;
+        });
+        // Selalu hitung ulang dengan jam device: menutup race di perbatasan jam buka
+        // (server bilang tutup jam 21:59, device pelanggan sudah 22:00, atau sebaliknya)
+        setClientOpen(isOpenAt(next, new Date()));
+      } catch {
+        // status server tetap dipakai
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Re-evaluate open/closed tiap 30s pakai jam device, agar overlay muncul otomatis
+  // tepat saat jam tutup (dan hilang saat jam buka) di sesi yang sedang terbuka.
+  useEffect(() => {
+    const t = setInterval(() => {
+      setHours((current) => {
+        if (current) setClientOpen(isOpenAt(current, new Date()));
+        return current;
+      });
+    }, 30_000);
+    return () => clearInterval(t);
+  }, []);
+
+  const isOpenNow = clientOpen ?? serverOpen;
+
+  // Auto mode tutup/buka: jangan ganggu pilihan user, kecuali status berubah.
+  useEffect(() => {
+    if (isOpenNow === false && closedView === null) setClosedView("overlay");
+    if (isOpenNow !== false && closedView !== null) setClosedView(null);
+  }, [isOpenNow, closedView]);
+
+  // "Cek status" di overlay: re-fetch settings tanpa reload halaman
+  function recheckStatus() {
+    (async () => {
+      try {
+        const res = await fetch("/api/settings");
+        const json = await res.json();
+        const next = json.data as { openHour: string; closeHour: string } | null;
+        setHours(next);
+        setClientOpen(next ? isOpenAt(next, new Date()) : null);
+      } catch {
+        // diam saja — status lama tetap dipakai
+      }
+    })();
+  }
 
   // Debounce 300ms
   useEffect(() => {
@@ -58,13 +159,19 @@ export function MenuClient({
   }, [initialItems, category, debounced]);
 
   function handleAdd(item: MenuItemDto) {
+    // Saat tutup: belum memilih → buka overlay; mode lihat-lihat → toast, jangan tambah
+    if (isOpenNow === false) {
+      if (closedView === null) setClosedView("overlay");
+      else if (closedView === "browse") {
+        pushToast("Pesanan belum bisa dibuat — warung masih tutup", "error");
+        return;
+      }
+    }
     if (hasRequiredOptions(item)) {
       setCustomizing(item);
     } else {
       // No required options → add directly (default: qty 1, no extras)
       pushToast(`${item.name} ditambahkan ke keranjang`);
-      // Direct add handled via a tiny store-specific call is done in modal path;
-      // here use the same addItem logic with default selection:
       // ponytail: malformed customizationOptions must not crash the add flow
       const opts = parseOptions(item.customizationOptions);
       useCart
@@ -132,6 +239,15 @@ export function MenuClient({
         <SearchBar value={query} onChange={setQuery} />
       </div>
 
+      {/* Operating hours banner — hanya saat BUKA. Saat tutup, overlay/banner terpisah yang mengambil alih */}
+      {isOpenNow === true && hours && (
+        <div className="pb-2">
+          <p className="inline-flex items-center rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-700">
+            Buka — {fmt(hours.openHour)}–{fmt(hours.closeHour)}
+          </p>
+        </div>
+      )}
+
       {/* Category chips */}
       <div className="pt-1 pb-3">
         <CategoryTabs categories={categories} selected={category} onSelect={setCategory} />
@@ -150,8 +266,31 @@ export function MenuClient({
         )}
       </section>
 
-      <CartBar onOpen={() => setCartOpen(true)} />
-      <CartDrawer open={cartOpen} onOpenChange={setCartOpen} />
+      {/* Saat tutup: overlay fullscreen atau banner mode lihat-lihat */}
+      {isOpenNow === false && closedView === "overlay" && hours && (
+        <ClosedOverlay
+          openHour={hours.openHour}
+          closeHour={hours.closeHour}
+          onBrowse={() => setClosedView("browse")}
+          onRecheck={recheckStatus}
+        />
+      )}
+      {isOpenNow === false && closedView === "browse" && hours && (
+        <ClosedBrowseBar openHour={hours.openHour} onExit={() => setClosedView("overlay")} />
+      )}
+      {isOpenNow !== false && <CartBar onOpen={() => setCartOpen(true)} />}
+      <CartDrawer
+        open={cartOpen && isOpenNow !== false}
+        onOpenChange={(open) => {
+          // Saat tutup: mencoba buka keranjang → tampilkan overlay tutup
+          if (open && isOpenNow === false) {
+            setClosedView((v) => v ?? "overlay");
+            setCartOpen(false);
+            return;
+          }
+          setCartOpen(open);
+        }}
+      />
 
       {customizing && (
         <CustomizationModal

@@ -9,18 +9,23 @@ import {
   ReceiptText,
   UtensilsCrossed,
   BarChart3,
+  QrCode,
   KeyRound,
+  Settings2,
   LogOut,
   Coffee,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
+import { IdleLogout } from "@/components/admin/idle-logout";
 
 const NAV = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/orders", label: "Pesanan", icon: ReceiptText },
   { href: "/admin/menu", label: "Menu", icon: UtensilsCrossed },
+  { href: "/admin/qr", label: "QR Meja", icon: QrCode },
   { href: "/admin/reports", label: "Laporan", icon: BarChart3 },
   { href: "/admin/change-password", label: "Ganti Password", icon: KeyRound },
+  { href: "/admin/settings", label: "Pengaturan", icon: Settings2 },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -68,6 +73,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="min-h-screen bg-bg">
+      {/* Auto-logout idle 60 menit — reset juga saat order baru masuk via SSE */}
+      <IdleLogout />
+
       {/* Top bar */}
       <header className="sticky top-0 z-40 border-b border-border bg-surface">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 h-14">

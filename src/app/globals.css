@@ -32,6 +32,13 @@
   --shadow-sm: 0 1px 2px rgba(61, 47, 38, 0.06);
   --shadow-md: 0 4px 10px rgba(61, 47, 38, 0.10);
   --shadow-lg: 0 8px 24px rgba(61, 47, 38, 0.14);
+
+  /* Layer order: sticky bar < backdrop < sheet < modal < toast/closed-overlay */
+  --z-sticky: 30;
+  --z-backdrop: 40;
+  --z-sheet: 50;
+  --z-modal: 60;
+  --z-toast: 70;
 }
 
 /* ─── Tailwind theme mapping ─────────────────────────────── */
@@ -221,4 +228,155 @@ body {
 
 .live-pulse {
   animation: live-pulse 1.8s ease-in-out infinite;
+}
+
+/* ─── Closed overlay (banner tutup interaktif) ───────────────── */
+
+/* Kunci scroll body saat overlay tutup aktif */
+body.closed-lock {
+  overflow: hidden;
+}
+
+/* Pelangi lembut di belakang ikon cangkir pada overlay tutup */
+@keyframes aura-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.aura-spin {
+  animation: aura-spin 12s linear infinite;
+}
+
+/* Uap cangkir kopi: naik, melengkung, memudar — loop tanpa putus */
+@keyframes steam {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) translateX(0) scale(0.8);
+  }
+  25% {
+    opacity: 0.9;
+  }
+  60% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-26px) translateX(var(--steam-x, 6px)) scale(1.15);
+  }
+}
+
+.steam {
+  animation: steam 2.6s ease-in-out infinite;
+  animation-delay: var(--steam-delay, 0s);
+}
+
+/* Bulan sabit di belakang teks: muncul perlahan begitu overlay tampil */
+@keyframes moon-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.moon-rise {
+  animation: moon-rise 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 250ms;
+}
+
+/* Countdown buka: muncul dengan fade begitu angkanya dihitung */
+@keyframes countdown-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.countdown-in {
+  animation: countdown-in 500ms ease-out both;
+  animation-delay: 500ms;
+}
+
+/* ─── Print: struk dapur & struk customer (modal admin) ─────── */
+
+/* Wadah hasil cetak: tersembunyi di layar. Saat modal struk terbuka, JSX me-render
+   SALINAN struk via React portal langsung di bawah <body> ke dalam .print-only —
+   jadi di kertas, seluruh layout admin disembunyikan dan salinan ini satu-satunya
+   konten. Tanpa trik visibility/absolute yang rentan bikin kertas kosong. */
+.print-only {
+  display: none;
+}
+
+@media print {
+  .print-only {
+    display: block;
+  }
+  /* Struk hitam-putih bersih ala printer thermal */
+  .print-only,
+  .print-only * {
+    color: #000 !important;
+    background: transparent !important;
+  }
+  /* Seluruh layout admin disembunyikan — salinan struk (child <body>) satu-satunya konten.
+     :not(.print-only) wajib: salinan struk juga div anak body, jangan sampai ikut hilang. */
+  body:has(.print-only) > div:not(.print-only) {
+    display: none !important;
+  }
+  /* Lebar struk = persis 80mm (printer thermal 80mm). Center otomatis
+     ketika tes print di printer A4 biasa; di thermal 80mm pas full-width. */
+  .print-only {
+    position: static !important;
+    width: 80mm !important;
+    max-width: 80mm !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    font-size: 12px;
+    overflow-wrap: break-word; /* alamat/kontak panjang tidak meluber keluar kertas */
+  }
+  .print-only .kitchen-ticket,
+  .print-only .receipt-print {
+    border: none !important;
+    padding: 0 !important;
+  }
+  /* Logo struk: printer thermal hitam-putih — sedikit digelapkan agar tetap terbaca.
+     Ukuran diikat di sini supaya gambar raksasa tidak meluber keluar kertas 80mm. */
+  .print-only .receipt-logo {
+    max-width: 60% !important;
+    max-height: 18mm !important;
+    filter: grayscale(1) contrast(1.15);
+  }
+}
+
+/* ─── Print: QR meja saja yang tercetak ─────────────────────── */
+@media print {
+  body:has(.qr-card) > div > header,
+  body:has(.qr-card) > div > nav {
+    display: none !important;
+  }
+  body:has(.qr-card) > div > main {
+    padding: 0 !important;
+    max-width: none !important;
+  }
+  .qr-card {
+    break-inside: avoid;
+    border: 1px dashed #bbb !important;
+    box-shadow: none !important;
+  }
+  /* Animasi entrance bikin elemen bisa tercetak transparan — matikan saat print */
+  .page-enter {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
 }

@@ -109,3 +109,19 @@ model AdminUser {
 
   createdAt DateTime @default(now())
 }
+
+// Singleton row (id fixed at 1) — shop-wide settings editable from the admin dashboard
+model ShopSetting {
+  id        Int      @id @default(1)
+  openHour  String?  // "HH:mm" — null = banner off
+  closeHour String?  // "HH:mm" — null = banner off
+
+  // Shop identity printed on the customer receipt (all optional — receipt
+  // falls back to SHOP_INFO defaults in src/lib/settings.ts when null)
+  shopName    String?
+  shopAddress String?
+  shopPhone   String?
+  logoUrl     String? // served from /api/uploads/menu/[file] — uploaded via admin
+
+  updatedAt DateTime @updatedAt
+}
