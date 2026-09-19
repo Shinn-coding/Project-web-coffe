@@ -1,15 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { mkdir, writeFile } from "node:fs/promises";
+import { put } from "@vercel/blob";
 import { randomUUID } from "node:crypto";
-import { join } from "node:path";
 import { requireAdmin } from "@/lib/admin-guard";
 
 export const dynamic = "force-dynamic";
 
-// ponytail: disk storage — swap for S3/Cloudinary when moving to multi-instance hosting.
-// Stored outside public/ on purpose: `next start` snapshots public/ at boot, so
-// files uploaded later would 404. Served via /api/uploads/menu/[file] instead.
-const UPLOAD_DIR = join(process.cwd(), "data", "uploads", "menu");
+/** Blob path prefix — keeps uploaded menu images grouped in the Blob store. */
+const BLOB_PATH_PREFIX = "menu";
 
 /** Max 5 MB — plenty for menu photos, keeps uploads cheap to reject. */
 const MAX_SIZE = 5 * 1024 * 1024;
@@ -109,13 +106,20 @@ export async function POST(req: NextRequest) {
 
   // ponytail: original filename is never used for storage — only the sniffed
   // extension + a random UUID, so path traversal via nama file mustahil.
+  // Vercel Blob (bukan filesystem): serverless FS read-only — localhost-only
+  // writes would 500 di production dan /tmp hilang antar instance (404).
   const ext = ALLOWED_TYPES[mime];
-  const fileName = `${randomUUID()}${ext}`;
-  const url = `/api/uploads/menu/${fileName}`;
+  const pathname = `${BLOB_PATH_PREFIX}/${randomUUID()}${ext}`;
 
   try {
-    await mkdir(UPLOAD_DIR, { recursive: true });
-    await writeFile(join(UPLOAD_DIR, fileName), buffer);
+    const blob = await put(pathname, buffer, {
+      access: "public",
+      contentType: mime,
+      addRandomSuffix: false,
+    });
+    // URL publik Vercel Blob (…blob.vercel-storage.com) — langsung dipakai UI
+    // dan disimpan ke DB (MenuItem.imageUrl / ShopSetting.logoUrl).
+    return NextResponse.json({ success: true, url: blob.url, preferred: PREFERRED.has(mime) });
   } catch (err) {
     console.error("[upload]", err);
     return NextResponse.json(
@@ -123,6 +127,4 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
-
-  return NextResponse.json({ success: true, url, preferred: PREFERRED.has(mime) });
 }

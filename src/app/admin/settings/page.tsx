@@ -298,6 +298,10 @@ function LogoUploader({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  // ponytail: legacy URLs can 404 (pre-Blob uploads) — show a fallback instead
+  // of a broken image icon; reset whenever the URL changes.
+  const [broken, setBroken] = useState(false);
+  useEffect(() => setBroken(false), [logoUrl]);
 
   async function handleFile(file: File) {
     setUploadError(null);
@@ -335,9 +339,14 @@ function LogoUploader({
 
       <div className="flex items-center gap-3">
         <div className="inline-flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius-sm)] border border-border bg-white">
-          {logoUrl ? (
+          {logoUrl && !broken ? (
             // eslint-disable-next-line @next/next/no-img-element -- preview sederhana; logo bisa eksternal, fixed-size img cukup
-            <img src={logoUrl} alt="Pratinjau logo" className="h-full w-full object-contain" />
+            <img
+              src={logoUrl}
+              alt="Pratinjau logo"
+              className="h-full w-full object-contain"
+              onError={() => setBroken(true)}
+            />
           ) : (
             <ImageOff className="h-5 w-5 text-muted" aria-hidden="true" />
           )}
@@ -370,7 +379,7 @@ function LogoUploader({
       <Input
         value={logoUrl}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="https://… atau /api/uploads/menu/xxx.png"
+        placeholder="https://… (URL gambar atau Vercel Blob)"
         aria-label="URL logo"
       />
 

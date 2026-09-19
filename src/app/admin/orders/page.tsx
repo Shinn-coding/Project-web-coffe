@@ -115,10 +115,26 @@ export default function AdminOrdersPage() {
   // Modal pratinjau struk: "kitchen" (tanpa harga, buat dapur) atau "customer" (dengan harga, buat kasir kasihkan)
   const [ticket, setTicket] = useState<{ o: OrderDto; kind: "kitchen" | "customer" } | null>(null);
 
+  // ponytail: guards against out-of-order responses — the 4s poll, SSE reloads,
+  // and advance() can overlap on a slow production network. A GET that resolves
+  // AFTER a newer request must never apply its (stale) snapshot to state —
+  // that is what made a just-advanced status "flap" back to the old one.
+  const loadSeq = useRef(0); // monotonically increasing request id
+  const loadAbort = useRef<AbortController | null>(null);
+
   const load = useCallback(async () => {
+    // Abort the previous GET so two fetches never overlap, and record this
+    // call's sequence number: only the newest request may commit state.
+    loadAbort.current?.abort();
+    const controller = new AbortController();
+    loadAbort.current = controller;
+    const mySeq = ++loadSeq.current;
+
     try {
-      const res = await fetch("/api/admin/orders");
+      const res = await fetch("/api/admin/orders", { signal: controller.signal });
       const json = await res.json();
+      // Superseded by a newer load() (or invalidated by advance()) — discard.
+      if (controller.signal.aborted || mySeq !== loadSeq.current) return;
       if (!res.ok) throw new Error(json.error ?? "Gagal memuat pesanan");
       const list: OrderDto[] = json.data;
 
@@ -136,9 +152,14 @@ export default function AdminOrdersPage() {
       setOrders(list);
       setError(null);
     } catch (err) {
+      // Aborted/superseded requests are not errors — stay silent.
+      if (controller.signal.aborted || mySeq !== loadSeq.current) return;
+      if (err instanceof DOMException && err.name === "AbortError") return;
       setError(err instanceof Error ? err.message : "Gagal memuat pesanan");
     } finally {
-      setLoading(false);
+      // Only the newest request may clear the loading flag — a late stale
+      // request finishing must not toggle UI state.
+      if (mySeq === loadSeq.current) setLoading(false);
     }
   }, [pushToast]);
 
@@ -147,7 +168,10 @@ export default function AdminOrdersPage() {
     // ponytail: safety-net poll only — the SSE listener below reloads the list
     // instantly on every new order, so this cadence no longer gates latency.
     const t = setInterval(load, 4000);
-    return () => clearInterval(t);
+    return () => {
+      clearInterval(t);
+      loadAbort.current?.abort(); // no in-flight GET may outlive the page
+    };
   }, [load]);
 
   useEffect(() => {
@@ -167,6 +191,10 @@ export default function AdminOrdersPage() {
     const next = nextStatus(o.status);
     if (!next) return;
     setAdvancing(o.id);
+    // ponytail: invalidate any in-flight polling GET — its snapshot predates
+    // this PATCH, so applying it would flip the status back (the flap bug).
+    // A fresh load() below re-syncs with the server's authoritative state.
+    loadSeq.current += 1;
     try {
       const res = await fetch(`/api/admin/orders/${o.id}`, {
         method: "PATCH",
@@ -176,6 +204,9 @@ export default function AdminOrdersPage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Gagal mengubah status");
       setOrders((prev) => prev.map((p) => (p.id === o.id ? json.data : p)));
+      // Refresh immediately (also aborts the invalidated GET) so the next 4s
+      // poll is not the thing that decides what the UI shows.
+      void load();
     } catch (err) {
       pushToast(err instanceof Error ? err.message : "Gagal mengubah status");
     } finally {

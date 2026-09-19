@@ -122,7 +122,7 @@ model ShopSetting {
   shopName    String?
   shopAddress String?
   shopPhone   String?
-  logoUrl     String? // served from /api/uploads/menu/[file] — uploaded via admin
+  logoUrl     String? // public URL (Vercel Blob …blob.vercel-storage.com) — uploaded via admin
 
   updatedAt DateTime @updatedAt
 }
