@@ -116,6 +116,11 @@ export async function POST(req: NextRequest) {
       access: "public",
       contentType: mime,
       addRandomSuffix: false,
+      // ponytail: koneksi Blob Store Vercel meng-generate nama var otomatis
+      // BLOB_READ_WRITE_TOKEN_READ_WRITE_TOKEN (tidak bisa di-rename dari
+      // dashboard), jadi token dioper eksplisit — bukan mengandalkan nama
+      // default BLOB_READ_WRITE_TOKEN yang dicari library secara implisit.
+      token: process.env.BLOB_READ_WRITE_TOKEN_READ_WRITE_TOKEN,
     });
     // URL publik Vercel Blob (…blob.vercel-storage.com) — langsung dipakai UI
     // dan disimpan ke DB (MenuItem.imageUrl / ShopSetting.logoUrl).
